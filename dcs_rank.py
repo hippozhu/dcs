@@ -81,48 +81,70 @@ def dcs_la(clf, preds_test, preds_test_proba, preds_neigh, preds_neigh_proba, YY
 
   return pred_ola, pred_lca, pred_ola_topn, pred_lca_topn, pred_ola_proba_topn, pred_lca_proba_topn
 
-def dcs_cv(X, y, clf, n_neigh, n_classifier, p):
+def dcs_cv(X, y, clf, n_neigh, n_classifier):
   acc = []
+  #neigh = NearestNeighbors(n_neigh, metric='euclidean', algorithm='brute')
+  neigh_est = NearestNeighbors(n_neigh, metric='manhattan', algorithm='brute')
   for train, test in StratifiedKFold(y, 3, random_state=random_state):
     X_train = X[train];y_train = y[train];X_test = X[test];y_test = y[test]
     clf.fit(X_train, y_train)
+    dict_aa = dict((clf.classes_[i], i) for i in xrange(clf.classes_.shape[0]))
+    to_class_index = np.vectorize(lambda x: dict_aa[x])
     y_pred = clf.predict(X_test)
 
     estimators = clf.estimators_
-    neigh = NearestNeighbors(n_neigh, metric='euclidean', algorithm='brute')
-    neigh.fit(X_train)
     preds_train = np.array(map(lambda e:e.predict(X_train), estimators))
     preds_train_proba = np.array(map(lambda e:e.predict_proba(X_train), estimators))
     preds_test = np.array(map(lambda e:e.predict(X_test), estimators)).T
     preds_test_proba = np.array(map(lambda e:e.predict_proba(X_test), estimators))
-    dist, knn = neigh.kneighbors(X_test)
+    #neigh.fit(X_train);dist, knn = neigh.kneighbors(X_test)
+    neigh_est.fit(preds_train.T);dist, knn = neigh_est.kneighbors(preds_test)
     preds_neigh = np.array(map(lambda nn: preds_train[:,nn], knn))
     preds_neigh_proba = np.array(map(lambda nn: preds_train_proba[:,nn,:], knn))
     Y_neigh = np.array(map(lambda nn: y_train[nn], knn))
-    dict_aa = dict((clf.classes_[i], i) for i in xrange(clf.classes_.shape[0]))
-    to_class_index = np.vectorize(lambda x: dict_aa[x])
     YY_neigh = to_class_index(Y_neigh)
 
     preds = dcs_la(clf, preds_test, preds_test_proba, preds_neigh, preds_neigh_proba, YY_neigh, n_classifier)
+    '''
+    preds_avg = preds_test.mean(axis=1)
+    mid = np.where((pred_avg>=p) & (pred_avg<=1-p))[0]
+    '''
     acc.append([accuracy_score(y_test, pred) for pred in (y_pred,) + preds])
 
   mean_acc = np.mean(acc, axis=0)
   print ' '.join('{:.3f}'.format(v) for v in mean_acc)
   return mean_acc
 
+def estimator_knn_cv(X, y, clf, n_neigh):
+  neigh_est = NearestNeighbors(n_neigh, metric='manhattan', algorithm='brute')
+  acc = []
+  for train, test in StratifiedKFold(y, 3):
+    X_train = X[train];y_train = y[train];X_test = X[test];y_test = y[test];clf.fit(X_train, y_train);estimators = clf.estimators_;preds_train = np.array(map(lambda e:e.predict(X_train), estimators)).T;preds_test = np.array(map(lambda e:e.predict(X_test), estimators)).T;neigh_est.fit(preds_train);dist, knn = neigh_est.kneighbors(preds_test)
+    preds_test_est_knn = np.array([[stats.mode(y_train[nn])[0][0] for nn in knn[:,:i]] for i in xrange(1,n_neigh,2)])
+    acc.append([accuracy_score(y_test, pred) for pred in np.vstack((preds_test_est_knn,clf.predict(X_test)))])
+  mean_acc = np.mean(acc, axis=0)
+  print ' '.join('{:.3f}'.format(v) for v in mean_acc)
+
 if __name__ == '__main__':
   n_estimators = int(sys.argv[1])
   depth = int(sys.argv[2])
-
   n_neigh = int(sys.argv[3])
   n_classifier = int(sys.argv[4])
 
-  p = float(sys.argv[5])
-
+  #p = float(sys.argv[5])
   X, y = loadPima()
   #X, y = loadBreastCancer()
   #X, y = loadIonosphere()
+  #X, y = loadDataSet('Bupa')
+  clf = BaggingClassifier(base_estimator=DecisionTreeClassifier(max_depth=depth), n_estimators=n_estimators)
+  print np.mean([dcs_cv(X, y, clf, n_neigh, n_classifier) for _ in xrange(10)], axis=0)
+  '''
+  X, y = loadPima()
+  X, y = loadBreastCancer()
+  X, y = loadIonosphere()
   clf = BaggingClassifier(base_estimator=DecisionTreeClassifier(max_depth=depth), n_estimators=n_estimators)
   #clf = AdaBoostClassifier(n_estimators=n_estimators)
   #clf = BaggingClassifier(n_estimators=n_estimators)
+  estimator_knn_cv(X, y, clf, n_neigh)
   print np.mean([dcs_cv(X, y, clf, n_neigh, n_classifier, p) for _ in xrange(10)], axis=0)
+  '''
