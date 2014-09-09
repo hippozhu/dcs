@@ -1,7 +1,7 @@
 import sys
 
 from sklearn.metrics import accuracy_score
-from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import BaggingClassifier, AdaBoostClassifier
 from sklearn.cross_validation import cross_val_score
@@ -85,7 +85,8 @@ def dcs_cv(X, y, clf, n_neigh, n_classifier):
   acc = []
   #neigh = NearestNeighbors(n_neigh, metric='euclidean', algorithm='brute')
   neigh_est = NearestNeighbors(n_neigh, metric='manhattan', algorithm='brute')
-  for train, test in StratifiedKFold(y, 3, random_state=random_state):
+  #for train, test in StratifiedKFold(y, 3, random_state=random_state):
+  for train, test in StratifiedKFold(y, 2, random_state=random_state):
     X_train = X[train];y_train = y[train];X_test = X[test];y_test = y[test]
     clf.fit(X_train, y_train)
     dict_aa = dict((clf.classes_[i], i) for i in xrange(clf.classes_.shape[0]))
@@ -97,8 +98,10 @@ def dcs_cv(X, y, clf, n_neigh, n_classifier):
     preds_train_proba = np.array(map(lambda e:e.predict_proba(X_train), estimators))
     preds_test = np.array(map(lambda e:e.predict(X_test), estimators)).T
     preds_test_proba = np.array(map(lambda e:e.predict_proba(X_test), estimators))
+    p_train = preds_train_proba.swapaxes(0,1)[:,:,0];p_test = preds_test_proba.swapaxes(0,1)[:,:,0]
     #neigh.fit(X_train);dist, knn = neigh.kneighbors(X_test)
     neigh_est.fit(preds_train.T);dist, knn = neigh_est.kneighbors(preds_test)
+    #neigh_est.fit(p_train);dist, knn = neigh_est.kneighbors(p_test)
     preds_neigh = np.array(map(lambda nn: preds_train[:,nn], knn))
     preds_neigh_proba = np.array(map(lambda nn: preds_train_proba[:,nn,:], knn))
     Y_neigh = np.array(map(lambda nn: y_train[nn], knn))
@@ -116,14 +119,36 @@ def dcs_cv(X, y, clf, n_neigh, n_classifier):
   return mean_acc
 
 def estimator_knn_cv(X, y, clf, n_neigh):
+  neigh = NearestNeighbors(n_neigh, metric='euclidean', algorithm='brute')
   neigh_est = NearestNeighbors(n_neigh, metric='manhattan', algorithm='brute')
   acc = []
-  for train, test in StratifiedKFold(y, 3):
-    X_train = X[train];y_train = y[train];X_test = X[test];y_test = y[test];clf.fit(X_train, y_train);estimators = clf.estimators_;preds_train = np.array(map(lambda e:e.predict(X_train), estimators)).T;preds_test = np.array(map(lambda e:e.predict(X_test), estimators)).T;neigh_est.fit(preds_train);dist, knn = neigh_est.kneighbors(preds_test)
-    preds_test_est_knn = np.array([[stats.mode(y_train[nn])[0][0] for nn in knn[:,:i]] for i in xrange(1,n_neigh,2)])
-    acc.append([accuracy_score(y_test, pred) for pred in np.vstack((preds_test_est_knn,clf.predict(X_test)))])
+  for train, test in StratifiedKFold(y, 5):
+    X_train = X[train];y_train = y[train];X_test = X[test];y_test = y[test];clf.fit(X_train, y_train);estimators = clf.estimators_;preds_train = np.array(map(lambda e:e.predict(X_train), estimators)).T;preds_test = np.array(map(lambda e:e.predict(X_test), estimators)).T;preds_train_proba = np.array(map(lambda e:e.predict_proba(X_train), estimators));preds_test_proba = np.array(map(lambda e:e.predict_proba(X_test), estimators));p_train = preds_train_proba.swapaxes(0,1)[:,:,0];p_test = preds_test_proba.swapaxes(0,1)[:,:,0]
+    neigh.fit(X_train);dist, knn = neigh.kneighbors(X_test)
+    neigh_est.fit(preds_train);dist, knn_est = neigh_est.kneighbors(preds_test)
+    #neigh_est.fit(p_train);dist, knn_est = neigh_est.kneighbors(p_test)
+    knn_combined_uniq = np.array(map(np.unique, np.hstack((knn[:,:30],knn_est[:,:30]))))
+    pp_uniq = np.array([stats.mode(y_train[nn])[0][0] for nn in knn_combined_uniq])
+    #pp_uniq = np.array([stats.mode(y_train[nn])[0][0] for nn in knn[:,:30]])
+    preds_test_est_knn = np.array([[stats.mode(y_train[nn])[0][0] for nn in knn_est[:,:i]] for i in xrange(1,n_neigh,2)])
+    acc.append([accuracy_score(y_test, pred) for pred in np.vstack((preds_test_est_knn,clf.predict(X_test), pp_uniq))])
   mean_acc = np.mean(acc, axis=0)
-  print ' '.join('{:.3f}'.format(v) for v in mean_acc)
+  print ' '.join('{:.3f}'.format(v) for v in mean_acc), ' max:{:.3f}'.format(mean_acc.max())
+
+def knn_est_cv(X, y, clf, n_neigh):
+  knn_est = KNeighborsClassifier(n_neigh, metric='manhattan', algorithm='brute')
+  knn_est1 = KNeighborsClassifier(n_neigh, metric='manhattan', algorithm='brute')
+  knn = KNeighborsClassifier(n_neigh, metric='euclidean', algorithm='brute')
+  acc_folds = []
+  for train, test in StratifiedKFold(y, 5):
+    X_train = X[train];y_train = y[train];X_test = X[test];y_test = y[test];clf.fit(X_train, y_train);estimators = clf.estimators_;preds_train = np.array(map(lambda e:e.predict(X_train), estimators)).T;preds_test = np.array(map(lambda e:e.predict(X_test), estimators)).T;preds_train_proba = np.array(map(lambda e:e.predict_proba(X_train), estimators));preds_test_proba = np.array(map(lambda e:e.predict_proba(X_test), estimators));p_train = preds_train_proba.swapaxes(0,1)[:,:,0];p_test = preds_test_proba.swapaxes(0,1)[:,:,0]
+    acc = []
+    for nn in xrange(1,n_neigh,2):
+      knn.set_params(n_neighbors=nn);knn_est.set_params(n_neighbors=nn);knn_est1.set_params(n_neighbors=nn)
+      knn.fit(X_train, y_train);knn_est.fit(preds_train, y_train);knn_est1.fit(p_train, y_train)
+      acc.append([accuracy_score(y_test, knn.predict(X_test)), accuracy_score(y_test, knn_est.predict(preds_test)), accuracy_score(y_test, knn_est1.predict(p_test))])
+    acc_folds.append(acc)
+  return np.mean(acc_folds, axis=0)
 
 if __name__ == '__main__':
   n_estimators = int(sys.argv[1])
@@ -132,12 +157,13 @@ if __name__ == '__main__':
   n_classifier = int(sys.argv[4])
 
   #p = float(sys.argv[5])
-  X, y = loadPima()
+  #X, y = loadPima()
   #X, y = loadBreastCancer()
-  #X, y = loadIonosphere()
+  X, y = loadIonosphere()
   #X, y = loadDataSet('Bupa')
   clf = BaggingClassifier(base_estimator=DecisionTreeClassifier(max_depth=depth), n_estimators=n_estimators)
-  print np.mean([dcs_cv(X, y, clf, n_neigh, n_classifier) for _ in xrange(10)], axis=0)
+  estimator_knn_cv(X, y, clf, n_neigh)
+  #knn_est_cv(X, y, clf, n_neigh)
   '''
   X, y = loadPima()
   X, y = loadBreastCancer()
