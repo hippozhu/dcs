@@ -6,6 +6,17 @@ from sklearn.datasets import fetch_mldata
 dataset_name = None
 dataset_path = {'Bupa':'/home/yzhu7/data/uci/bupa.data'}
 
+def load_split_scale(data_file, delimiter=',', usecols=None, label_col=-1, skiprows=0):
+  data = np.loadtxt(data_file, delimiter=delimiter, usecols=usecols, skiprows=skiprows)
+  if label_col==-1:
+    X = data[:, :-1]
+    y = data[:, -1].astype(np.int32)
+  else:
+    X = data[:, 1:]
+    y = data[:, 0].astype(np.int32)
+  X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
+  return X_scaled, y
+  
 def loadDataSet(datasetname):
   dataset_name = datasetname
   data = np.loadtxt(dataset_path[datasetname], delimiter=',')
@@ -46,6 +57,34 @@ def loadIris():
   y = iris.target[50:].astype(np.int32)
   return X_scaled, y
 
+def loadGlass():
+  data_file = '/home/yzhu7/data/uci/glass/glass.data'
+  return load_split_scale(data_file, usecols=range(1, 11))
+
+def loadBlood():
+  data_file = '/home/yzhu7/data/uci/transfusion/transfusion.data'
+  return load_split_scale(data_file, skiprows=1)
+
+def loadSonar():
+  data_file = '/home/yzhu7/data/uci/sonar/sonar.all-data.converted'
+  return load_split_scale(data_file)
+
+def loadSpam():
+  data_file = '/home/yzhu7/data/uci/spam/spambase.data'
+  return load_split_scale(data_file)
+
+def loadWine():
+  data_file = '/home/yzhu7/data/uci/wine/wine.data'
+  return load_split_scale(data_file, label_col=0)
+
+def loadYeast():
+  data_file = '/home/yzhu7/data/uci/yeast/yeast.data.converted'
+  return load_split_scale(data_file, delimiter=None, usecols=range(1,10))
+  
+def loadSegmentation():
+  data_file = '/home/yzhu7/data/uci/segmentation/segmentation.converted'
+  return load_split_scale(data_file, label_col=0)
+  
 def loadMnist():
   mnist = fetch_mldata('MNIST original')
   X = mnist.data
