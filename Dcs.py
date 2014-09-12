@@ -1,85 +1,89 @@
 import sys, time
-import numpy as np
 import multiprocessing as mp
-#import multiprocessing.dummy as mt
 import itertools
+
 from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
-from dcs_rank import *
-from MyClassifier import *
-n_procs = 15
+from sklearn.ensemble import BaggingClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.cross_validation import StratifiedKFold, StratifiedShuffleSplit
 
-def dcs(X_train, y_train, X_test, y_test, clf):
-  clf.fit(X_train, y_train)
-  estimators = clf.estimators_
-  preds_train = np.array(map(lambda e:e.predict(X_train), estimators)).T
-  preds_test = np.array(map(lambda e:e.predict(X_test), estimators)).T
+from mydata import *
+from KNORA import *
 
-  knora = KNORA(X_train, y_train, preds_train, X_test, y_test, preds_test)
-  knora.build_neighborhood(50)
-  #selected_ensemble =  
-
-def common_oracles(neighbors_performance_est):
-  neighbors, performance_est = neighbors_performance_est
-  oracles = None
-  for i, neighbor in enumerate(neighbors):
-    current_oracles = np.where(performance_est[neighbor])[0]
-    if oracles == None:
-      oracles = current_oracles
-    intersect = np.intersect1d(oracles, current_oracles, True)
-    if len(intersect) > 0:
-      oracles = intersect
-    else:
+def oracles_intersect(neighborhood_oracles):
+  common_oracles = np.all(neighborhood_oracles, axis=0)
+  if common_oracles.any():
+    return common_oracles
+  common_oracles = np.ones(neighborhood_oracles.shape[1], dtype=bool)
+  for i, no in enumerate(neighborhood_oracles):
+    next_common_oracles = common_oracles & no
+    if not np.any(next_common_oracles):
       break
-  if len(oracles)==0:
-    oracles = np.array(range(performance_est.shape[1]))
-  return i+1, oracles
+    else:
+      common_oracles = next_common_oracles
+  return common_oracles
 
-class KNORA:
-  def __init__(self, X_train, y_train, preds_train, X_test, y_test, preds_test):
+def oracles_union(neighborhood_oracles):
+  common_oracles = np.any(neighborhood_oracles, axis=0)
+  if common_oracles.any():
+    return common_oracles
+  else:
+    return np.ones(neighborhood_oracles.shape[1], dtype=bool)
+
+class DES:
+  def __init__(self, X_train, y_train, X_test, y_test, clf):
     self.X_train = X_train
     self.y_train = y_train
-    self.preds_train = preds_train
     self.X_test = X_test
     self.y_test = y_test
-    self.preds_test = preds_test
+    self.clf = clf
 
-  def build_neighborhood(self, n_neighbors):
-    self.dist, self.knn = \
-    NearestNeighbors(n_neighbors, metric='euclidean', algorithm='brute')\
-    .fit(self.X_train)\
-    .kneighbors(self.X_test)
+  def preprocessing(self, n_neighbors):
+    train, val = [(_, __) for _, __ in StratifiedShuffleSplit(y_train, 1, test_size=.3)][0]
+    self.X_val = self.X_train[val];self.y_val = self.y_train[val]
+    self.X_train = self.X_train[train];self.y_train = self.y_train[train]
+    self.clf.fit(self.X_train, self.y_train)
+    self.preds_train = np.array(map(lambda e:e.predict(self.X_train), self.clf.estimators_)).T
+    self.preds_val = np.array(map(lambda e:e.predict(self.X_val), self.clf.estimators_)).T
+    self.preds_proba_test = np.array([e.predict_proba(self.X_test) for e in self.clf.estimators_]).swapaxes(0,1)
 
-    self.dist_est, self.knn_est = \
-    NearestNeighbors(n_neighbors, metric='manhattan', algorithm='brute')\
-    .fit(self.preds_train)\
-    .kneighbors(self.preds_test)
+    #_, self.knn = NearestNeighbors(n_neighbors, metric='euclidean', algorithm='brute').fit(self.X_train).kneighbors(self.X_test)
+    _, self.knn = NearestNeighbors(n_neighbors, metric='euclidean', algorithm='brute').fit(self.X_val).kneighbors(self.X_test)
 
-    self.performance_est = np.vstack(pred==y for pred, y in zip(self.preds_train, self.y_train))
-
-  def eliminate(self):
-    '''
-    pool = mp.Pool(n)
-    #pool = mt.Pool(n)
-    result = pool.map(common_oracles, itertools.izip(self.knn, itertools.repeat(self.performance_est)), chunksize = 5)
-    pool.close()
-    pool.join()
-    '''
-    result = map(common_oracles, itertools.izip(self.knn, itertools.repeat(self.performance_est)))
-    return map(lambda x: x[1], result)
+    #self.oracles = np.vstack(pred==y for pred, y in zip(self.preds_train, self.y_train))
+    self.oracles = np.vstack(pred==y for pred, y in zip(self.preds_val, self.y_val))
   
-  #def predict(self, selected, weights = None):
-    
-if __name__ == '__main__':
-  X, y = loadPima()
-  clf = MyBaggingClassifier(base_estimator=DecisionTreeClassifier(max_depth=3), n_estimators=100)
-  folds = [(train, test) for train, test in StratifiedKFold(y, 10)]
-  for train, test in folds:
-    X_train = X[train];y_train = y[train];X_test = X[test];y_test = y[test]
-    clf.fit(X_train, y_train)
-    estimators = clf.estimators_
-    preds_train = np.array(map(lambda e:e.predict(X_train), estimators)).T;preds_test = np.array(map(lambda e:e.predict(X_test), estimators)).T
-    kk = KNORA(X_train, y_train, preds_train, X_test, y_test, preds_test)
-    kk.build_neighborhood(int(sys.argv[1]))
-    pp = kk.eliminate()
-    print accuracy_score(y_test, clf.predict(X_test)), accuracy_score(y_test, clf.predict_selective(X_test, pp))
+  def knora(self):
+    Knora = KNORA(self.oracles, self.knn)
+    ensembles_eliminate = Knora.knora_eliminate()
+    ensembles_union = Knora.knora_union()
+    return self.predict(ensembles_eliminate), self.predict(ensembles_union)
 
+  def predict(self, ensembles, weights = None):
+    proba = np.array([preds[ensemble].mean(axis=0) for ensemble, preds in itertools.izip(ensembles, self.preds_proba_test)])
+    return self.clf.classes_.take(np.argmax(proba, axis=1), axis=0)
+
+if __name__ == '__main__':
+  #X, y = loadPima()
+  #X, y = loadBreastCancer()
+  #X, y = loadIonosphere()
+  #X, y = loadYeast()
+  #X, y = loadSegmentation()
+  #X, y = loadWine()
+  #X, y = loadSpam()
+  #X, y = loadSonar()
+  X, y = loadBlood()
+  clf = BaggingClassifier(base_estimator=DecisionTreeClassifier(max_depth=3), n_estimators=100)
+  acc = []
+  for train, test in StratifiedKFold(y, 2):
+    X_train = X[train];y_train = y[train];X_test = X[test];y_test = y[test]
+    kk = DES(X_train, y_train, X_test, y_test, clf)
+    kk.preprocessing(int(sys.argv[1]))
+    knora_eliminate_pred, knora_union_pred = kk.knora()
+    clf.fit(X_train, y_train)
+    acc.append([accuracy_score(y_test, clf.predict(X_test)),
+    accuracy_score(y_test, knora_eliminate_pred),
+    accuracy_score(y_test, knora_union_pred)])
+
+  print np.mean(acc, axis=0)

@@ -1,6 +1,5 @@
 import numpy as np
 from sklearn import datasets, preprocessing
-from sklearn.cross_validation import StratifiedKFold
 from sklearn.datasets import fetch_mldata
 
 dataset_name = None
@@ -90,13 +89,4 @@ def loadMnist():
   X = mnist.data
   y = mnist.target
   return X, y
-
-def stratifiedTrainTest(X, y, nk, idx_fold):
-  skf = StratifiedKFold(y, nk)
-  idx = 0
-  for train, test in skf:
-    if idx == idx_fold:
-      return X[train], y[train], X[test], y[test]
-    idx += 1
-  return None, None, None, None
 
