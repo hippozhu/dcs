@@ -1,4 +1,5 @@
 import numpy as np
+import itertools
 
 class KNORA:
   def __init__(self, preds, y, cr):
@@ -39,23 +40,45 @@ class KNORA:
     else:
       return np.ones(neighborhood_oracles.shape[1], dtype=bool)
 
+def neighorbood_precision(u, preds_cr, pred_test):
+  v = np.vstack(pc==pt for pc, pt in itertools.izip(preds_cr, pred_test))
+  a = v.sum(axis=1).astype(float, copy=False)
+  a[a==0] = np.inf
+  b = (u[pred_test] & v).sum(axis=1)
+  return np.divide(b, a)
+
+def neighorbood_precision_proba(u, preds_proba_cr, pred_test):
+  v = np.vstack(pc==pt for pc, pt in itertools.izip(preds_cr, pred_test))
+  a = v.sum(axis=1).astype(float, copy=False)
+  a[a==0] = np.inf
+  b = (u[pred_test] & v).sum(axis=1)
+  return np.divide(b, a)
+
+def neighorbood_accuracy_proba(preds_proba_cr, yy_cr):
+  return np.array([[pp[yy] for pp, yy in itertools.izip(p, yy_cr)] for p in preds_proba_cr]).mean(axis=1)
+
 class DCSLA:
   def __init__(self, preds_cr, preds_proba_cr, y_cr, preds_test, cr):
     self.preds_cr = preds_cr
-    self.preds_proba = preds_proba
+    self.preds_proba_cr = preds_proba_cr
     self.preds_test = preds_test
     self.y_cr = y_cr 
     self.cr = cr
-    self.oracles = np.vstack(pred==yy for pred, yy in zip(self.preds_cr, self.y_cr))
 
   def local_accuracy(self):
-    la = np.vstack([self.oracles[region].mean(axis=0) for region in self.cr])
-    return np.vstack(l==m for l, m in itertools.izip(la, la.max(axis=1)))
+    oracles = np.vstack(pred==yy for pred, yy in zip(self.preds_cr, self.y_cr))
+    la = np.vstack([oracles[region].mean(axis=0) for region in self.cr])
+    return la
+    #return np.vstack(l==m for l, m in itertools.izip(la, la.max(axis=1)))
 
-  def class_local_accuracy(self):
-    qq = np.array([precision_score(y_true, y_pred, average=None)[y_test] for y_true, y_pred, y_test in itertools.izip(itertools.repeat(des.y_cr[des.knn[0]]), des.preds_cr[des.knn[0]].T, des.preds_test[0])])
-    rr = np.array([[precision_score(y_true, y_pred, average=None)[y_test] for y_true, y_pred, y_test in itertools.izip(itertools.repeat(des.y_cr[des.knn[i]]), des.preds_cr[des.knn[i]].T, des.preds_test[i])] for i in xrange(des.y_test.shape[0])])
-    return 1
+  def local_accuracy_proba(self):
+    lap = np.array([neighorbood_accuracy_proba(self.preds_proba_cr[region].swapaxes(0,1), self.y_cr[region]) for region in self.cr])
+    return lap
 
-  def neighorbood_precision(self):
-    return 1
+  def class_local_accuracy(self, classes):
+    cla = np.array([neighorbood_precision(np.array([self.y_cr[region]==c for c in classes]), self.preds_cr[region].T, self.preds_test[i]) for i, region in enumerate(self.cr)])
+    return cla
+
+  def class_local_accuracy_proba(self, classes):
+    cla = np.array([neighorbood_precision(np.array([self.y_cr[region]==c for c in classes]), self.preds_cr[region].T, self.preds_test[i]) for i, region in enumerate(self.cr)])
+    return cla

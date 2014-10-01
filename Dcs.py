@@ -1,6 +1,7 @@
 import sys, time
 import multiprocessing as mp
 import itertools
+import cPickle as pickle
 
 from sklearn.neighbors import NearestNeighbors, KNeighborsClassifier
 from sklearn.ensemble import BaggingClassifier
@@ -25,7 +26,7 @@ class DES:
       self.X_cr = X_val
       self.y_cr = y_val
 
-  def classifier_generation(self):
+  def generate_classifier(self):
     self.clf.fit(self.X_train, self.y_train)
     self.estimators = self.clf.estimators_
     self.y_cr_remap = np.searchsorted(self.clf.classes_, self.y_cr)
@@ -43,40 +44,69 @@ class DES:
     Knora = KNORA(self.preds_cr, self.y_cr_remap, cr)
     return self.predict(Knora.knora_eliminate()), self.predict(Knora.knora_union())
 
+  def dcsla(self, cr):
+    Dcsla = DCSLA(self.preds_cr, self.preds_proba_cr, self.y_cr_remap, self.preds_test, cr)
+    la = Dcsla.local_accuracy()
+    cla = Dcsla.class_local_accuracy(self.clf.classes_)
+    lap = Dcsla.local_accuracy_proba()
+    return la, cla, lap
+
+  def ensemble_predict(self, ranking, p):
+    ensembles = np.greater_equal(ranking, np.minimum(np.percentile(ranking, p, axis=1), ranking.max(axis=1)).reshape((self.y_test.shape[0],1)))
+    return self.predict(ensembles)
+
   def predict(self, ensembles, weights = None):
     proba = np.array([preds[ensemble].mean(axis=0) for ensemble, preds in itertools.izip(ensembles, self.preds_proba_test)])
     return self.clf.classes_.take(np.argmax(proba, axis=1), axis=0)
 
 if __name__ == '__main__':
-  #X, y = loadPima()
-  #X, y = loadBreastCancer()
-  #X, y = loadIonosphere()
-  X, y = loadYeast()
-  #X, y = loadSegmentation()
-  #X, y = loadWine()
-  #X, y = loadSpam()
-  #X, y = loadSonar()
-  #X, y = loadBlood()
+  myFuncs = {
+  'pima': loadPima,
+  'breast': loadBreastCancer,
+  'iono': loadIonosphere,
+  'yeast': loadYeast,
+  'seg': loadSegmentation,
+  'wine': loadWine,
+  'spam': loadSpam,
+  'sonar': loadSonar,
+  'blood': loadBlood,
+  }
+  X, y = myFuncs[sys.argv[-1]]()
+  print X.shape
   clf = BaggingClassifier(base_estimator=DecisionTreeClassifier(max_depth=3), n_estimators=100)
   acc = []
-  for train, test in StratifiedKFold(y, 2):
+  for train, test in StratifiedKFold(y, 5):
     X_train = X[train];y_train = y[train]
     X_test = X[test];y_test = y[test]
-
     '''
     des = DES(X_train, y_train, X_test, y_test, clf)
     '''
-    tr, val = [(_, __) for _, __ in StratifiedShuffleSplit(y_train, 1, test_size=.3)][0]
+    tr, val = [(_, __) for _, __ in StratifiedShuffleSplit(y_train, 1, test_size=.5)][0]
     X_val = X_train[val];y_val= y_train[val]
     X_train = X_train[tr];y_train = y_train[tr]
     des = DES(X_train, y_train, X_test, y_test, clf, X_val, y_val)
 
-    des.classifier_generation()
+    des.generate_classifier()
     des.competence_region(int(sys.argv[1]))
     knora_eliminate_pred, knora_union_pred = des.knora(des.knn)
+    la_ranking, cla_ranking, lap_ranking = des.dcsla(des.knn)
+    la_pred_max = des.ensemble_predict(la_ranking, 100)
+    cla_pred_max = des.ensemble_predict(cla_ranking, 100)
+    lap_pred_max = des.ensemble_predict(lap_ranking, 100)
+    la_pred = des.ensemble_predict(la_ranking, int(sys.argv[2]))
+    cla_pred = des.ensemble_predict(cla_ranking, int(sys.argv[2]))
+    lap_pred = des.ensemble_predict(lap_ranking, int(sys.argv[2]))
     clf.fit(X_train, y_train)
     acc.append([accuracy_score(y_test, clf.predict(X_test)),
     accuracy_score(y_test, knora_eliminate_pred),
-    accuracy_score(y_test, knora_union_pred)])
+    accuracy_score(y_test, knora_union_pred),
+    accuracy_score(y_test, la_pred_max),
+    accuracy_score(y_test, cla_pred_max),
+    accuracy_score(y_test, lap_pred_max),
+    accuracy_score(y_test, la_pred),
+    accuracy_score(y_test, cla_pred),
+    accuracy_score(y_test, lap_pred)])
 
-  print np.mean(acc, axis=0)
+  mean_acc = np.mean(acc, axis=0)
+  print ' '.join('{:6.2f}'.format(100*v) for v in mean_acc)
+  print ' '.join('{:6.2f}'.format(100*v) for v in mean_acc-mean_acc[0])
