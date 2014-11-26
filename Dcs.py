@@ -36,7 +36,6 @@ class DES:
     self.preds_test = np.array([e.predict(self.X_test) for e in self.estimators]).T
     self.preds_proba_test = np.array([e.predict_proba(self.X_test) for e in self.estimators]).swapaxes(0,1)
 
-
   def competence_region(self, n_neighbors):
     _, self.knn = NearestNeighbors(n_neighbors, metric='euclidean', algorithm='brute').fit(self.X_cr).kneighbors(self.X_test)
 
