@@ -27,7 +27,6 @@ class DES:
       self.y_cr = y_val
 
   def generate_classifier(self):
-    self.clf.fit(self.X_train, self.y_train)
     self.estimators = self.clf.estimators_
     self.y_cr_remap = np.searchsorted(self.clf.classes_, self.y_cr)
 
@@ -36,8 +35,13 @@ class DES:
     self.preds_test = np.array([e.predict(self.X_test) for e in self.estimators]).T
     self.preds_proba_test = np.array([e.predict_proba(self.X_test) for e in self.estimators]).swapaxes(0,1)
 
-  def competence_region(self, n_neighbors):
-    _, self.knn = NearestNeighbors(n_neighbors, metric='euclidean', algorithm='brute').fit(self.X_cr).kneighbors(self.X_test)
+  def competence_region(self, n_neighbors, L=None):
+    if L is not None:
+      X_cr_t = L.dot(self.X_cr.T).T
+      X_test_t = L.dot(self.X_test.T).T
+      _, self.knn = NearestNeighbors(n_neighbors, metric='euclidean', algorithm='brute').fit(X_cr_t).kneighbors(X_test_t)
+    else:
+      _, self.knn = NearestNeighbors(n_neighbors, metric='euclidean', algorithm='brute').fit(self.X_cr).kneighbors(self.X_test)
 
   def knora(self, cr):
     Knora = KNORA(self.preds_cr, self.y_cr_remap, cr)
@@ -77,13 +81,15 @@ if __name__ == '__main__':
   for train, test in StratifiedKFold(y, 5):
     X_train = X[train];y_train = y[train]
     X_test = X[test];y_test = y[test]
-    '''
+
+    clf.fit(X_train, y_train)
     des = DES(X_train, y_train, X_test, y_test, clf)
     '''
     tr, val = [(_, __) for _, __ in StratifiedShuffleSplit(y_train, 1, test_size=.5)][0]
     X_val = X_train[val];y_val= y_train[val]
     X_train = X_train[tr];y_train = y_train[tr]
     des = DES(X_train, y_train, X_test, y_test, clf, X_val, y_val)
+    '''
 
     des.generate_classifier()
     des.competence_region(int(sys.argv[1]))
@@ -95,7 +101,7 @@ if __name__ == '__main__':
     la_pred = des.ensemble_predict(la_ranking, int(sys.argv[2]))
     cla_pred = des.ensemble_predict(cla_ranking, int(sys.argv[2]))
     lap_pred = des.ensemble_predict(lap_ranking, int(sys.argv[2]))
-    clf.fit(X_train, y_train)
+    #clf.fit(X_train, y_train)
     acc.append([accuracy_score(y_test, clf.predict(X_test)),
     accuracy_score(y_test, knora_eliminate_pred),
     accuracy_score(y_test, knora_union_pred),
