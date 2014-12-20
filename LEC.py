@@ -3,7 +3,8 @@ from sklearn.neighbors import NearestNeighbors
 import itertools
 from scipy.stats import rankdata
 from Dcs import *
-from metric_learn import MYLMNN
+#from metric_learn import MYLMNN
+from lmnn_pp import *
 
 def find_in_neighborhood(neighborhoods, performance):
   n_target = neighborhoods.shape[0]
@@ -30,11 +31,22 @@ def lmnn(X_train, y_train, X_test, y_test, clf, k, v):
   after = des_test(X_train, y_train, X_test, y_test, clf, 5, ml.L)
   return before, after
 
-def des_test(X_train, y_train, X_test, y_test, clf, k, L=None):
+def lmnn1(X_train, y_train, X_test, y_test, clf, k, v):
+  before = des_test(X_train, y_train, X_test, y_test, clf, k)
+  preds_train = np.array(map(lambda e:e.predict(X_train), clf.estimators_)).T
+  performance = np.array([pt==yt for pt,yt in itertools.izip(preds_train, y_train)])
+  ml = LMNN_PP(k=k, alpha=0.0001, mu=0.5, c=0.01)
+  ml.process_input(X_train, performance)
+  ml.fit(v)
+  #L = LA.cholesky(ml.M)
+  after = des_test(X_train, y_train, X_test, y_test, clf, k, ml.M)
+  return before, after
+
+def des_test(X_train, y_train, X_test, y_test, clf, k, M=None):
   p = 70
   des = DES(X_train, y_train, X_test, y_test, clf)
   des.generate_classifier()
-  des.competence_region(k, L)
+  des.competence_region(k, M)
   knora_eliminate_pred, knora_union_pred = des.knora(des.knn)
   la_ranking, cla_ranking, lap_ranking = des.dcsla(des.knn)
   la_pred_max = des.ensemble_predict(la_ranking, 100)
@@ -132,7 +144,7 @@ if __name__ == '__main__':
     if len(sys.argv) == 3:
       acc += local_expertise_enhance(X_train, y_train, X_test, y_test, clf, k)
     else:
-      b, a = lmnn(X_train, y_train, X_test, y_test, clf, k, v)
+      b, a = lmnn1(X_train, y_train, X_test, y_test, clf, k, v)
       before.append(b);after.append(a)
 
   if len(sys.argv) == 3:

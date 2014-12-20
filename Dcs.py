@@ -35,11 +35,11 @@ class DES:
     self.preds_test = np.array([e.predict(self.X_test) for e in self.estimators]).T
     self.preds_proba_test = np.array([e.predict_proba(self.X_test) for e in self.estimators]).swapaxes(0,1)
 
-  def competence_region(self, n_neighbors, L=None):
-    if L is not None:
-      X_cr_t = L.dot(self.X_cr.T).T
-      X_test_t = L.dot(self.X_test.T).T
-      _, self.knn = NearestNeighbors(n_neighbors, metric='euclidean', algorithm='brute').fit(X_cr_t).kneighbors(X_test_t)
+  def competence_region(self, n_neighbors, M=None):
+    if M is not None:
+      #X_cr_t = L.dot(self.X_cr.T).T
+      #X_test_t = L.dot(self.X_test.T).T
+      _, self.knn = NearestNeighbors(n_neighbors, algorithm='brute', metric='mahalanobis', VI=M).fit(self.X_cr).kneighbors(self.X_test)
     else:
       _, self.knn = NearestNeighbors(n_neighbors, metric='euclidean', algorithm='brute').fit(self.X_cr).kneighbors(self.X_test)
 
