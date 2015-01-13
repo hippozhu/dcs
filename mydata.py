@@ -1,12 +1,15 @@
 import numpy as np
 from sklearn import datasets, preprocessing
 from sklearn.datasets import fetch_mldata
+from sklearn.cross_validation import StratifiedShuffleSplit
+from sklearn.cross_validation import StratifiedKFold
 
 dataset_name = None
 dataset_path = {'Bupa':'/home/yzhu7/data/uci/bupa.data'}
 
 def load_split_scale(data_file, delimiter=',', usecols=None, label_col=-1, skiprows=0):
   data = np.loadtxt(data_file, delimiter=delimiter, usecols=usecols, skiprows=skiprows)
+  data = np.array(list(set(tuple(p) for p in data)))
   if label_col==-1:
     X = data[:, :-1]
     y = data[:, -1].astype(np.int32)
@@ -16,6 +19,7 @@ def load_split_scale(data_file, delimiter=',', usecols=None, label_col=-1, skipr
   X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
   return X_scaled, y
   
+'''
 def loadDataSet(datasetname):
   dataset_name = datasetname
   data = np.loadtxt(dataset_path[datasetname], delimiter=',')
@@ -23,30 +27,43 @@ def loadDataSet(datasetname):
   X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
   y = data[:, -1].astype(np.int32)
   return X_scaled, y
+'''
 
 def loadPima():
+  data_file = '/home/yzhu7/data/diabetes/pima-indians-diabetes.data'
+  return load_split_scale(data_file)
+  '''
   dataset_name = 'Pima'
   data = np.loadtxt('/home/yzhu7/data/diabetes/pima-indians-diabetes.data', delimiter=',')
   X = data[:, :-1]
   X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
   y = data[:, -1].astype(np.int32)
   return X_scaled, y
+  '''
 
 def loadBreastCancer():
+  data_file = '/home/yzhu7/data/uci/breast-cancer/breast-cancer-wisconsin.data.nomissing'
+  return load_split_scale(data_file)
+  '''
   dataset_name = 'Breast Cancer'
   data = np.loadtxt('/home/yzhu7/data/uci/breast-cancer/breast-cancer-wisconsin.data.nomissing', delimiter=',')
   X = data[:, 1:-1]
   X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
   y = data[:, -1].astype(np.int32)
   return X_scaled, y
+  '''
 
 def loadIonosphere():
+  data_file = '/home/yzhu7/data/uci/ionosphere/ionosphere.data'
+  return load_split_scale(data_file)
+  '''
   dataset_name = 'Ionosphere'
   data = np.loadtxt('/home/yzhu7/data/uci/ionosphere/ionosphere.data', delimiter=',')
   X = data[:, 1:-1]
   X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
   y = data[:, -1].astype(np.int32)
   return X_scaled, y
+  '''
 
 def loadIris():
   dataset_name = 'Iris'
@@ -90,3 +107,13 @@ def loadMnist():
   y = mnist.target
   return X, y
 
+def train_val_test_split(y, nfold, test_size):
+  skf = StratifiedKFold(y, nfold)
+  for train_val, test in skf:
+    sss = StratifiedShuffleSplit(y[train_val], 1, test_size=test_size, random_state=0)
+    t, v = [(train, val) for train, val in sss][0]
+    yield train_val[t], train_val[v], test
+
+def pprint(arr):
+  for row in arr:
+    print ' '.join('{:5.2f}'.format(100*v) for v in row)

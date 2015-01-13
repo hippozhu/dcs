@@ -22,6 +22,7 @@ def compute_lec_increment(preds_train, y_train, neighborhoods, performance):
   diff_in_neigh = find_in_neighborhood(neighborhoods, performance)
   return ((1-2*lec)+diff_in_neigh/k).T, lec
 
+'''
 def lmnn(X_train, y_train, X_test, y_test, clf, k, v):
   before = des_test(X_train, y_train, X_test, y_test, clf, 5)
   preds_train = np.array(map(lambda e:e.predict(X_train), clf.estimators_)).T
@@ -30,31 +31,47 @@ def lmnn(X_train, y_train, X_test, y_test, clf, k, v):
   ml.fit(X_train, performance, v)
   after = des_test(X_train, y_train, X_test, y_test, clf, 5, ml.L)
   return before, after
-
+'''
 def lmnn1(X_train, y_train, X_test, y_test, clf, k, v):
   before = des_test(X_train, y_train, X_test, y_test, clf, k)
   preds_train = np.array(map(lambda e:e.predict(X_train), clf.estimators_)).T
   performance = np.array([pt==yt for pt,yt in itertools.izip(preds_train, y_train)])
-  ml = LMNN_PP(k=k, alpha=0.0001, mu=0.5, c=0.01)
-  ml.process_input(X_train, performance)
-  ml.fit(v)
-  #L = LA.cholesky(ml.M)
-  after = des_test(X_train, y_train, X_test, y_test, clf, k, ml.M)
+  lmnn = LMNN_PP(k=k, alpha=1e-5, mu=0.5, c=1, v=v)
+  lmnn.process_input(X_train, performance)
+  #lmnn.M = pickle.load(open('M.pickle'))
+  max_iter = 5000
+  lmnn.fit(max_iter)
+  after = des_test(X_train, y_train, X_test, y_test, clf, k, lmnn.M)
+  #pickle.dump(lmnn.M, open('M.pickle', 'wb'))
   return before, after
 
+def find_competence_region(X_train, X_test, n_neighbors, M=None):
+  if M is not None:
+    nn = NearestNeighbors(n_neighbors, algorithm='brute', metric='mahalanobis', VI=M).fit(X_train).kneighbors(X_test, return_distance=False)
+  else:
+    nn = NearestNeighbors(n_neighbors, metric='euclidean', algorithm='brute').fit(X_train).kneighbors(X_test, return_distance=False)
+  return [nn[:, :i] for i in xrange(1, n_neighbors+1, 2)]
+  
 def des_test(X_train, y_train, X_test, y_test, clf, k, M=None):
-  p = 70
   des = DES(X_train, y_train, X_test, y_test, clf)
   des.generate_classifier()
   des.competence_region(k, M)
-  knora_eliminate_pred, knora_union_pred = des.knora(des.knn)
-  la_ranking, cla_ranking, lap_ranking = des.dcsla(des.knn)
-  la_pred_max = des.ensemble_predict(la_ranking, 100)
-  cla_pred_max = des.ensemble_predict(cla_ranking, 100)
-  lap_pred_max = des.ensemble_predict(lap_ranking, 100)
-  la_pred = des.ensemble_predict(la_ranking, p)
-  cla_pred = des.ensemble_predict(cla_ranking, p)
-  lap_pred = des.ensemble_predict(lap_ranking, p)
+  knn_list = find_competence_region(X_train, X_test, k, M)
+  acc = []
+  for knn in knn_list:
+    pred = []
+    knora_eliminate_pred, knora_union_pred = des.knora(knn)
+    pred.append(knora_eliminate_pred)
+    pred.append(knora_union_pred)
+    la_ranking, cla_ranking, lap_ranking = des.dcsla(knn)
+    for p in [25, 50, 75, 100]:
+      pred.append(des.ensemble_predict(la_ranking, p))
+      pred.append(des.ensemble_predict(cla_ranking, p))
+    acc.append(np.apply_along_axis(accuracy_score, 1, pred, y_test))
+  original_acc = np.empty(len(knn_list))
+  original_acc.fill(accuracy_score(y_test, clf.predict(X_test)))
+  return np.hstack((original_acc[:, None], acc))
+  '''
   return [accuracy_score(y_test, clf.predict(X_test)),
   accuracy_score(y_test, knora_eliminate_pred),
   accuracy_score(y_test, knora_union_pred),
@@ -64,8 +81,10 @@ def des_test(X_train, y_train, X_test, y_test, clf, k, M=None):
   accuracy_score(y_test, la_pred),
   accuracy_score(y_test, cla_pred),
   #accuracy_score(y_test, lap_pred)
+  accuracy_score(y_test, la_pred_50),
+  accuracy_score(y_test, cla_pred_50)
   ]
-
+  '''
 def local_expertise_enhance(X_train, y_train, X_test, y_test, clf, k):
   n_train = y_train.shape[0]
   sample_weight = np.ones((len(clf.estimators_), y_train.shape[0]))
@@ -134,7 +153,7 @@ if __name__ == '__main__':
   clf = BaggingClassifier(base_estimator=DecisionTreeClassifier(max_depth=3),n_estimators=100)
   before = []; after = []
   i = 0
-  nfold = 10
+  nfold = 5;val_times = 1.0
   acc = np.zeros((21, 7))
   for train, test in StratifiedKFold(y, nfold):
     print 'fold', i
@@ -152,7 +171,8 @@ if __name__ == '__main__':
   else:
     b = np.array(before);a = np.array(after)
     pickle.dump((b, a), open(sys.argv[-1]+'k%dv%f.lmnn.pickle'%(k, v), 'w'))
-    print b, a
-    print b.mean(axis=0), a.mean(axis=0)
-    print (a-b).mean(axis=0)
+    #print b, a
+    print ' '.join('{:6.2f}'.format(100*v) for v in b.mean(axis=0))
+    print ' '.join('{:6.2f}'.format(100*v) for v in a.mean(axis=0))
+    print ' '.join('{:6.2f}'.format(100*v) for v in (a-b).mean(axis=0))
 
