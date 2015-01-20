@@ -64,9 +64,11 @@ def des_test(X_train, y_train, X_test, y_test, clf, k, M=None):
     pred.append(knora_eliminate_pred)
     pred.append(knora_union_pred)
     la_ranking, cla_ranking, lap_ranking = des.dcsla(knn)
-    for p in [25, 50, 75, 100]:
-      pred.append(des.ensemble_predict(la_ranking, p))
-      pred.append(des.ensemble_predict(cla_ranking, p))
+    #for p in [70, 50, 30, 10]:
+    #  pred.append(des.ensemble_predict(la_ranking, pct=p))
+    for n in [1, 2, 5, 10, 20, 30, 50, 70, 90]:
+      pred.append(des.ensemble_predict(la_ranking, topn=n))
+      #pred.append(des.ensemble_predict(cla_ranking, p))
     acc.append(np.apply_along_axis(accuracy_score, 1, pred, y_test))
   original_acc = np.empty(len(knn_list))
   original_acc.fill(accuracy_score(y_test, clf.predict(X_test)))

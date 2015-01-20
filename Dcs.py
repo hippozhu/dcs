@@ -52,8 +52,16 @@ class DES:
     lap = Dcsla.local_accuracy_proba()
     return la, cla, lap
 
-  def ensemble_predict(self, ranking, p):
-    ensembles = np.greater_equal(ranking, np.minimum(np.percentile(ranking, p, axis=1), ranking.max(axis=1)).reshape((self.y_test.shape[0],1)))
+  def ensemble_predict(self, ranking, pct=None, topn=None):
+    if pct is not None:
+      ensembles = np.greater_equal(ranking, np.minimum(np.percentile(ranking, pct, axis=1), ranking.max(axis=1)).reshape((self.y_test.shape[0],1)))
+    else:
+      ensembles = np.empty(ranking.shape, dtype=np.bool)
+      ensembles.fill(False)
+      tops = np.argsort(ranking)[:,-topn:]
+      rows = np.hstack([[i]*tops.shape[1] for i in xrange(tops.shape[0])])
+      cols = tops.flatten()
+      ensembles[rows, cols] = True
     return self.predict(ensembles)
 
   def predict(self, ensembles, weights = None):

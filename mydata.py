@@ -117,3 +117,7 @@ def train_val_test_split(y, nfold, test_size):
 def pprint(arr):
   for row in arr:
     print ' '.join('{:5.2f}'.format(100*v) for v in row)
+
+def pprint_dif(arr):
+  for row in np.hstack((arr[:,0][:,None], arr[:,1:]- arr[0][0])):
+    print ' '.join('{:4.1f}'.format(100*v) for v in row)
