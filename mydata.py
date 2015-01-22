@@ -118,6 +118,12 @@ def pprint(arr):
   for row in arr:
     print ' '.join('{:5.2f}'.format(100*v) for v in row)
 
-def pprint_dif(arr):
-  for row in np.hstack((arr[:,0][:,None], arr[:,1:]- arr[0][0])):
-    print ' '.join('{:4.1f}'.format(100*v) for v in row)
+def pprint_diff(arr):
+  for i, row in enumerate(np.hstack((arr[:,0][:,None], arr[:,1:]- arr[0][0]))):
+    print '[%2d]'%(i) + ' '.join('{:4.1f}'.format(100*v) for v in row)
+
+def max_diff(arr):
+  arr_diff = (arr[:,1:]- arr[0][0])
+  max_val = arr_diff.max()
+  max_arg = arr_diff.argmax()
+  print '%.2f, (%d, %d)' %(100*max_val, max_arg/arr_diff.shape[1], max_arg%arr_diff.shape[1])

@@ -73,20 +73,7 @@ def des_test(X_train, y_train, X_test, y_test, clf, k, M=None):
   original_acc = np.empty(len(knn_list))
   original_acc.fill(accuracy_score(y_test, clf.predict(X_test)))
   return np.hstack((original_acc[:, None], acc))
-  '''
-  return [accuracy_score(y_test, clf.predict(X_test)),
-  accuracy_score(y_test, knora_eliminate_pred),
-  accuracy_score(y_test, knora_union_pred),
-  accuracy_score(y_test, la_pred_max),
-  accuracy_score(y_test, cla_pred_max),
-  #accuracy_score(y_test, lap_pred_max),
-  accuracy_score(y_test, la_pred),
-  accuracy_score(y_test, cla_pred),
-  #accuracy_score(y_test, lap_pred)
-  accuracy_score(y_test, la_pred_50),
-  accuracy_score(y_test, cla_pred_50)
-  ]
-  '''
+
 def local_expertise_enhance(X_train, y_train, X_test, y_test, clf, k):
   n_train = y_train.shape[0]
   sample_weight = np.ones((len(clf.estimators_), y_train.shape[0]))
