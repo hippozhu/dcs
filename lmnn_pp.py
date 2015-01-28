@@ -4,7 +4,6 @@ from sklearn.neighbors import NearestNeighbors
 from multiprocessing import Pool
 import itertools
 from numpy import linalg as LA
-from LEC import *
 
 class LMNN_PP:
   def __init__(self,
@@ -20,9 +19,31 @@ class LMNN_PP:
     self.v = v
     self.n_iter_total = 0
 
-  def process_input(self, X, y, tr, val, te, clf):
+  def process_input(self, X_train, y_train, pp_train, X_test, y_test, pp_test):
+    self.X_train = X_train;self.y_train = y_train
+    self.pp_train = pp_train
+    self.X_val = None
+    self.X_test = X_test;self.y_test = y_test
+    self.pp_test = pp_test
+    self.M = np.eye(X_train.shape[1])
+    self.G = np.zeros(self.M.shape)
+    self.active_set = None
+    self.ij = []
+    self.ijl = []
+    self.loss = np.inf
+    self.pd_pp = pairwise_distances(self.pp_train, metric='hamming')
+    np.fill_diagonal(self.pd_pp, np.inf)
+    if self.X_val is not None:
+      #self.pp_val = pp_val
+      self.pd_pp_val = pairwise_distances(self.pp_val, self.pp_train, metric='hamming')
+    self.pd_pp_test = pairwise_distances(self.pp_test, self.pp_train, metric='hamming')
+    self.mm = []
+    self.stats= []
+
+  def process_input_old(self, X, y, tr, val, te, clf):
     self.clf = clf;self.clf.fit(X[tr], y[tr]);estimators = self.clf.estimators_
-    self.X_train = X[tr];self.y_train = y[tr];preds_train = np.array(map(lambda e:e.predict(self.X_train), estimators)).T;self.pp_train = np.array([pt==yt for pt,yt in itertools.izip(preds_train, self.y_train)])
+    self.X_train = X[tr];self.y_train = y[tr]
+    preds_train = np.array(map(lambda e:e.predict(self.X_train), estimators)).T;self.pp_train = np.array([pt==yt for pt,yt in itertools.izip(preds_train, self.y_train)])
     if val is not None:
       self.X_val = X[val];self.y_val = y[val];preds_val = np.array(map(lambda e:e.predict(self.X_val), estimators)).T;self.pp_val = np.array([pt==yt for pt,yt in itertools.izip(preds_val, self.y_val)])
     else:
@@ -244,11 +265,11 @@ def find_l(kvc_xp):
   for ti in target_inds:
     dict_jl[ti] = np.where((dist_x < dist_x[ti] + c) & (~similar))[0].tolist()
   return dict_jl
-
+'''
 def train_lmnn(X_y_tr_te):
   X, y, (train, test), ff = X_y_tr_te
   max_iter = 500
-  k = 11;mu=0.5;c=1;v=0.3
+  k = 7;mu=0.5;c=1;v=0.2
   lmnn = LMNN_PP(k=k, alpha=1e-5, mu=mu, c=c, v=v)
   clf = BaggingClassifier(base_estimator=DecisionTreeClassifier(max_depth=3),n_estimators=100)
   lmnn.process_input(X, y, train, None, test, clf)
@@ -287,5 +308,7 @@ def calc_des(lmnns, idx_m):
 
 if __name__ == '__main__':
   rr = run()
-  pickle.dump(rr, open('Ionok11mu.5c1v.3max500nfold10.pickle', 'wb'))
+  #pickle.dump(rr, open('Ionok11mu.5c1v.3max500nfold10.pickle', 'wb'))
   #pickle.dump(rr, open('Pimak11mu.5c1v.05max500.pickle', 'wb'))
+  pickle.dump(rr, open('Bloodk7mu.5c1v.2.pickle', 'wb'))
+'''

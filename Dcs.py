@@ -1,5 +1,4 @@
 import sys, time
-import multiprocessing as mp
 import itertools
 import cPickle as pickle
 
@@ -67,3 +66,32 @@ class DES:
   def predict(self, ensembles, weights = None):
     proba = np.array([preds[ensemble].mean(axis=0) for ensemble, preds in itertools.izip(ensembles, self.preds_proba_test)])
     return self.clf.classes_.take(np.argmax(proba, axis=1), axis=0)
+
+def find_competence_region(X_train, X_test, n_neighbors, M=None):
+  if M is not None:
+    nn = NearestNeighbors(n_neighbors, algorithm='brute', metric='mahalanobis', VI=M).fit(X_train).kneighbors(X_test, return_distance=False)
+  else:
+    nn = NearestNeighbors(n_neighbors, metric='euclidean', algorithm='brute').fit(X_train).kneighbors(X_test, return_distance=False)
+  return [nn[:, :i] for i in xrange(1, n_neighbors+1, 2)]
+  
+def des_test(X_train, y_train, X_test, y_test, clf, k, M=None):
+  des = DES(X_train, y_train, X_test, y_test, clf)
+  des.generate_classifier()
+  knn_list = find_competence_region(X_train, X_test, k, M)
+  acc = []
+  for knn in knn_list:
+    pred = []
+    knora_eliminate_pred, knora_union_pred = des.knora(knn)
+    pred.append(knora_eliminate_pred)
+    pred.append(knora_union_pred)
+    la_ranking, cla_ranking, lap_ranking = des.dcsla(knn)
+    #for p in [70, 50, 30, 10]:
+    #  pred.append(des.ensemble_predict(la_ranking, pct=p))
+    for n in [1, 2, 5, 10, 20, 30, 50, 70, 90]:
+      pred.append(des.ensemble_predict(la_ranking, topn=n))
+      #pred.append(des.ensemble_predict(cla_ranking, p))
+    acc.append(np.apply_along_axis(accuracy_score, 1, pred, y_test))
+  original_acc = np.empty(len(knn_list))
+  original_acc.fill(accuracy_score(y_test, clf.predict(X_test)))
+  return np.hstack((original_acc[:, None], acc))
+
