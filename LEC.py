@@ -3,8 +3,6 @@ from sklearn.neighbors import NearestNeighbors
 import itertools
 from scipy.stats import rankdata
 from Dcs import *
-#from metric_learn import MYLMNN
-#from lmnn_pp import *
 
 def find_in_neighborhood(neighborhoods, performance):
   n_target = neighborhoods.shape[0]
@@ -28,14 +26,18 @@ def compute_lec_test(neigh_test, pp_test, pp_train):
   return lec.T
 
 class LEC:
-  def __init__(self, X_train, y_train, X_test, y_test, k):
+  def __init__(self, X_train, y_train, X_test, y_test, clf, k, l):
     self.X_train = X_train
     self.y_train = y_train
     self.X_test = X_test
     self.y_test = y_test
+    self.clf = clf
     self.k = k
+    self.l = l
     self.n_train = self.y_train.shape[0]
-    self.l = 5
+    self.n_iter_total = 0
+    self.sample_weight = np.ones((len(clf.estimators_), y_train.shape[0]))
+    self.update_neigh()
     
   def update_neigh(self, M=None):
     if M is None:
@@ -45,35 +47,43 @@ class LEC:
       self.neigh_train = NearestNeighbors(self.k+1, metric='mahalanobis', algorithm='brute', VI=M).fit(self.X_train).kneighbors(self.X_train, return_distance=False)[:,1:]
       self.neigh_test = NearestNeighbors(self.k, metric='mahalanobis', algorithm='brute', VI=M).fit(self.X_train).kneighbors(self.X_test, return_distance=False)
 
-  def fit(self, max_iter, clf, sample_weight):
-    # k = neigh_train.shape[1]
-    # self.sample_weight = np.ones((len(clf.estimators_), y_train.shape[0]))
+  def fit(self, max_iter):
     for _ in xrange(max_iter):
-      preds_train = np.array([e.predict(self.X_train) for e in clf.estimators_]).T;pp_train = np.array([pt==yt for pt,yt in itertools.izip(preds_train, self.y_train)])
-      preds_test = np.array([e.predict(self.X_test) for e in clf.estimators_]).T;pp_test = np.array([pt==yt for pt,yt in itertools.izip(preds_test, self.y_test)])
+      self.n_iter_total += 1
+      des_acc = des_test(self.X_train, self.y_train, self.X_test, self.y_test, self.clf, self.k)
+      preds_train = np.array([e.predict(self.X_train) for e in self.clf.estimators_]).T;pp_train = np.array([pt==yt for pt,yt in itertools.izip(preds_train, self.y_train)])
+      preds_test = np.array([e.predict(self.X_test) for e in self.clf.estimators_]).T;pp_test = np.array([pt==yt for pt,yt in itertools.izip(preds_test, self.y_test)])
       lec_increment, lec_train = compute_lec_increment(self.neigh_train, pp_train)
       lec_test = compute_lec_test(self.neigh_test, pp_test, pp_train)
-      print 'lec_val:%.4f, %.4f' %(lec_train.mean(), lec_test.mean())
 
       top = np.vstack(rankdata(li, method='max') > (self.n_train-self.l) for li in lec_increment)
       positive_lec_increment = lec_increment>0
-      to_be_adjusted = top & positive_lec_increment
+      #to_be_adjusted = top & positive_lec_increment
+      #to_be_adjusted = positive_lec_increment & self.clf.estimators_samples_
+      to_be_adjusted = top & positive_lec_increment & self.clf.estimators_samples_
       to_be_increased = to_be_adjusted & (~pp_train.T)
       to_be_decreased = to_be_adjusted & pp_train.T
 
-      error_rate = 1-np.array([e.score(self.X_train, self.y_train) for e in clf.estimators_])
+      error_rate = 1-np.array([e.score(self.X_train, self.y_train) for e in self.clf.estimators_])
       alpha = np.sqrt(error_rate/(1-error_rate)) # alpha < 1
       for i, (inc, dec) in enumerate(itertools.izip(to_be_increased, to_be_decreased)):
-	sample_weight[i,inc] = sample_weight[i,inc]/alpha[i]
-	sample_weight[i,dec] = sample_weight[i,dec]*alpha[i]
+	#sample_weight[i,inc] = sample_weight[i,inc]/alpha[i]
+	#sample_weight[i,dec] = sample_weight[i,dec]*alpha[i]
+	if inc.sum() > 0:
+	  self.sample_weight[i,inc] = self.sample_weight[i,inc]*1.03
+	if dec.sum() > 0:
+	  self.sample_weight[i,dec] = self.sample_weight[i,dec]/1.03
 
-      for i, e in enumerate(clf.estimators_):
-	e.fit(self.X_train[clf.estimators_samples_[i]],\
-	      self.y_train[clf.estimators_samples_[i]],\
-	      sample_weight=sample_weight[i, clf.estimators_samples_[i]])
-      #print accuracy_score(self.y_train, clf.predict(self.X_train)), accuracy_score(self.y_test, clf.predict(self.X_test))
-      #pprint(des_test(self.X_train, self.y_train, self.X_test, self.y_test, clf, k))
-
+      print '(%d):%.4f, %.4f, (%d,%d,%d,%d), %.4f@(%d,%d)' %(self.n_iter_total, lec_train.mean(), lec_test.mean(), positive_lec_increment.sum(), to_be_adjusted.sum(), to_be_increased.sum(), to_be_decreased.sum(), des_acc.max(), des_acc.argmax()/des_acc.shape[1], des_acc.argmax()%des_acc.shape[1])
+      print lec_increment.max(), lec_increment.min(), lec_increment.mean()
+      #print  np.where(des_acc==des_acc.max())
+      #print ''
+      pprint(des_acc)
+      for i, e in enumerate(self.clf.estimators_):
+	e.fit(self.X_train[self.clf.estimators_samples_[i]],\
+	      self.y_train[self.clf.estimators_samples_[i]],\
+	      sample_weight=self.sample_weight[i, self.clf.estimators_samples_[i]])
+'''
 def local_expertise_enhance(X_train, y_train, X_test, y_test, clf, k):
   n_train = y_train.shape[0]
   sample_weight = np.ones((len(clf.estimators_), y_train.shape[0]))
@@ -116,7 +126,7 @@ def local_expertise_enhance(X_train, y_train, X_test, y_test, clf, k):
   pprint_diff(acc[-1][-1][None,:])
   
   return np.array(acc)
-
+'''
 def des_test1(X_train, y_train, X_test, y_test, clf, k, M=None):
   des = DES(X_train, y_train, X_test, y_test, clf)
   des.generate_classifier()
