@@ -40,30 +40,6 @@ class LMNN_PP:
     self.mm = []
     self.stats= []
 
-  def process_input_old(self, X, y, tr, val, te, clf):
-    self.clf = clf;self.clf.fit(X[tr], y[tr]);estimators = self.clf.estimators_
-    self.X_train = X[tr];self.y_train = y[tr]
-    preds_train = np.array(map(lambda e:e.predict(self.X_train), estimators)).T;self.pp_train = np.array([pt==yt for pt,yt in itertools.izip(preds_train, self.y_train)])
-    if val is not None:
-      self.X_val = X[val];self.y_val = y[val];preds_val = np.array(map(lambda e:e.predict(self.X_val), estimators)).T;self.pp_val = np.array([pt==yt for pt,yt in itertools.izip(preds_val, self.y_val)])
-    else:
-      self.X_val = None
-    self.X_test = X[te];self.y_test = y[te];preds_test = np.array(map(lambda e:e.predict(self.X_test), estimators)).T;self.pp_test = np.array([pt==yt for pt,yt in itertools.izip(preds_test, self.y_test)])
-    self.M = np.eye(X.shape[1])
-    self.G = np.zeros(self.M.shape)
-    self.active_set = None
-    self.ij = []
-    self.ijl = []
-    self.loss = np.inf
-    self.pd_pp = pairwise_distances(self.pp_train, metric='hamming')
-    np.fill_diagonal(self.pd_pp, np.inf)
-    if self.X_val is not None:
-      #self.pp_val = pp_val
-      self.pd_pp_val = pairwise_distances(self.pp_val, self.pp_train, metric='hamming')
-    self.pd_pp_test = pairwise_distances(self.pp_test, self.pp_train, metric='hamming')
-    self.mm = []
-    self.stats= []
-
   def fit(self, max_iter, ff):
     # update M iteratively
     for n_iter in xrange(max_iter):
@@ -265,6 +241,7 @@ def find_l(kvc_xp):
   for ti in target_inds:
     dict_jl[ti] = np.where((dist_x < dist_x[ti] + c) & (~similar))[0].tolist()
   return dict_jl
+
 '''
 def train_lmnn(X_y_tr_te):
   X, y, (train, test), ff = X_y_tr_te
