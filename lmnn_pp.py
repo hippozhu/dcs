@@ -17,15 +17,23 @@ class LMNN_PP:
     self.alpha= alpha
     self.c = c
     self.v = v
-    self.n_iter_total = 0
 
-  def process_input(self, X_train, y_train, pp_train, X_test, y_test, pp_test):
-    self.X_train = X_train;self.y_train = y_train
-    self.pp_train = pp_train
-    self.X_val = None
-    self.X_test = X_test;self.y_test = y_test
-    self.pp_test = pp_test
-    self.M = np.eye(X_train.shape[1])
+  #def process_input(self, X_train, y_train, pp_train, X_test, y_test, pp_test):
+  def init_input(self, X, y, train, test):
+    self.X_train = X[train]
+    self.y_train = y[train]
+    self.X_test = X[test]
+    self.y_test = y[test]
+    self.M = np.eye(self.X_train.shape[1])
+    self.n_iter_total = 0
+    self.mm = []
+    self.stats= []
+
+  def update_input(self, clf):
+    preds_train = np.array([e.predict(self.X_train) for e in clf.estimators_]).T
+    self.pp_train = np.array([pt==yt for pt,yt in itertools.izip(preds_train, self.y_train)])
+    preds_test = np.array([e.predict(self.X_test) for e in clf.estimators_]).T
+    self.pp_test = np.array([pt==yt for pt,yt in itertools.izip(preds_test, self.y_test)])
     self.G = np.zeros(self.M.shape)
     self.active_set = None
     self.ij = []
@@ -33,12 +41,10 @@ class LMNN_PP:
     self.loss = np.inf
     self.pd_pp = pairwise_distances(self.pp_train, metric='hamming')
     np.fill_diagonal(self.pd_pp, np.inf)
-    if self.X_val is not None:
+    #if self.X_val is not None:
       #self.pp_val = pp_val
-      self.pd_pp_val = pairwise_distances(self.pp_val, self.pp_train, metric='hamming')
+      #self.pd_pp_val = pairwise_distances(self.pp_val, self.pp_train, metric='hamming')
     self.pd_pp_test = pairwise_distances(self.pp_test, self.pp_train, metric='hamming')
-    self.mm = []
-    self.stats= []
 
   def fit(self, max_iter, ff):
     # update M iteratively
@@ -47,9 +53,9 @@ class LMNN_PP:
       self.pd_X = np.square(\
       pairwise_distances(self.X_train, metric='mahalanobis', VI=self.M))
       np.fill_diagonal(self.pd_X, np.inf)
-      if self.X_val is not None:
-        self.pd_X_val = np.square(\
-	pairwise_distances(self.X_val, self.X_train, metric='mahalanobis', VI=self.M))
+      #if self.X_val is not None:
+      #  self.pd_X_val = np.square(\
+      #	pairwise_distances(self.X_val, self.X_train, metric='mahalanobis', VI=self.M))
       diff_G = np.zeros(self.M.shape)
       new_ijl = None
       if n_iter%10 == 0:
@@ -192,11 +198,13 @@ class LMNN_PP:
     #pd_pp_neigh = np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp, knn))
     #p_target_train = (pd_pp_neigh < self.v).mean()
     p_target_val = .0
+    '''
     if self.X_val is not None:
       _, knn = NearestNeighbors(self.k, algorithm='brute', metric='mahalanobis', VI=self.M).fit(self.X_train).kneighbors(self.X_val)
       pd_pp_neigh = np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp_val, knn))
       p_target_val = (pd_pp_neigh < self.v).mean()
     _, knn = NearestNeighbors(2*self.k, algorithm='brute', metric='mahalanobis', VI=self.M).fit(self.X_train).kneighbors(self.X_test)
+    '''
     p_target_test = np.array([(np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp_test, knn[:, :k]))<self.v).mean() for k in xrange(1, 2*self.k, 2)])
     #pd_pp_neigh = np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp_test, knn))
     #p_target_test = (pd_pp_neigh < self.v).mean()
@@ -242,50 +250,3 @@ def find_l(kvc_xp):
     dict_jl[ti] = np.where((dist_x < dist_x[ti] + c) & (~similar))[0].tolist()
   return dict_jl
 
-'''
-def train_lmnn(X_y_tr_te):
-  X, y, (train, test), ff = X_y_tr_te
-  max_iter = 500
-  k = 7;mu=0.5;c=1;v=0.2
-  lmnn = LMNN_PP(k=k, alpha=1e-5, mu=mu, c=c, v=v)
-  clf = BaggingClassifier(base_estimator=DecisionTreeClassifier(max_depth=3),n_estimators=100)
-  lmnn.process_input(X, y, train, None, test, clf)
-  lmnn.fit(max_iter, ff)
-  return lmnn
-
-def run():
-  #X, y = loadPima()
-  X, y = loadIonosphere()
-  nfold = 10
-  folds = [(tr, te) for tr, te in StratifiedKFold(y, nfold)]
-
-  pool = Pool(nfold)
-  rr = pool.map(train_lmnn,\
-  itertools.izip(itertools.repeat(X), itertools.repeat(y), folds, range(nfold)),\
-  chunksize=1)
-  pool.close()
-  pool.join()
-  return rr
-
-def des_test_lmnn(lmnn_i):
-  k = 50
-  lmnn, i = lmnn_i
-  if i == -1:
-    return des_test(lmnn.X_train, lmnn.y_train, lmnn.X_test, lmnn.y_test, lmnn.clf, k)
-  else:
-    return des_test(lmnn.X_train, lmnn.y_train, lmnn.X_test, lmnn.y_test, lmnn.clf, k, lmnn.mm[i-1 if len(lmnn.mm)>=i else -1])
-
-def calc_des(lmnns, idx_m):
-  pool = Pool(10)
-  after = pool.map(des_test_lmnn, itertools.izip(lmnns, idx_m))
-  pool.close()
-  pool.join()
-  return np.mean(after, axis=0)
-  #return after
-
-if __name__ == '__main__':
-  rr = run()
-  #pickle.dump(rr, open('Ionok11mu.5c1v.3max500nfold10.pickle', 'wb'))
-  #pickle.dump(rr, open('Pimak11mu.5c1v.05max500.pickle', 'wb'))
-  pickle.dump(rr, open('Bloodk7mu.5c1v.2.pickle', 'wb'))
-'''

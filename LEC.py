@@ -28,23 +28,24 @@ def compute_lec_test(neigh_test, pp_test, pp_train):
   return lec.T
 
 class LEC:
-  def __init__(self, X_train, y_train, X_test, y_test, clf, k, l):
-    self.X_train = X_train
-    self.y_train = y_train
-    self.X_test = X_test
-    self.y_test = y_test
+  def __init__(self, clf, k, l):
     self.clf = clf
     self.clf_orig = copy.deepcopy(clf)
     self.k = k
     self.l = l
-    self.n_train = self.y_train.shape[0]
-    self.n_iter_total = 0
-    self.sample_weight = np.ones((len(clf.estimators_), y_train.shape[0]))
-    self.update_neigh()
     self.ww = []
     self.clfs = []
     
-  def update_neigh(self, M=None):
+  def init_input(self, X, y, train, test):
+    self.X_train = X[train]
+    self.y_train = y[train]
+    self.X_test = X[test]
+    self.y_test = y[test]
+    self.n_train = self.y_train.shape[0]
+    self.n_iter_total = 0
+    self.sample_weight = np.ones((len(self.clf.estimators_), self.y_train.shape[0]))
+    
+  def update_input(self, M):
     if M is None:
       self.neigh_train = NearestNeighbors(self.k+1, metric='euclidean', algorithm='brute').fit(self.X_train).kneighbors(self.X_train, return_distance=False)[:,1:]
       self.neigh_test = NearestNeighbors(self.k, metric='euclidean', algorithm='brute').fit(self.X_train).kneighbors(self.X_test, return_distance=False)
@@ -91,7 +92,7 @@ class LEC:
   def report(self):
     print '(%d):%.4f,%.4f (%d,%d,%d,%d)' %(self.n_iter_total, self.lec_train.mean(), self.lec_test.mean(), self.positive_lec_increment.sum(), self.to_be_adjusted.sum(), self.to_be_increased.sum(), self.to_be_decreased.sum())
     #, des_acc.max(), des_acc.argmax()/des_acc.shape[1], des_acc.argmax()%des_acc.shape[1]
-    print self.lec_increment.max(), self.lec_increment.min(), self.lec_increment.mean()
+    #print self.lec_increment.max(), self.lec_increment.min(), self.lec_increment.mean()
     #print  np.where(des_acc==des_acc.max())
     #print ''
     #pprint(des_acc)
