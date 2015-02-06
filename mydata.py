@@ -32,14 +32,6 @@ def loadDataSet(datasetname):
 def loadPima():
   data_file = '/home/yzhu7/data/diabetes/pima-indians-diabetes.data'
   return load_split_scale(data_file)
-  '''
-  dataset_name = 'Pima'
-  data = np.loadtxt('/home/yzhu7/data/diabetes/pima-indians-diabetes.data', delimiter=',')
-  X = data[:, :-1]
-  X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
-  y = data[:, -1].astype(np.int32)
-  return X_scaled, y
-  '''
 
 def loadBreastCancer():
   data_file = '/home/yzhu7/data/uci/breast-cancer/breast-cancer-wisconsin.data.nomissing'
