@@ -107,8 +107,8 @@ def train_val_test_split(y, nfold, test_size):
     yield train_val[t], train_val[v], test
 
 def pprint(arr):
-  for row in arr:
-    print ' '.join('{:5.2f}'.format(100*v) for v in row)
+  for i, row in enumerate(arr):
+    print '[%2d]'%(i) + ' '.join('{:4.1f}'.format(100*v) for v in row)
 
 def pprint_diff(arr):
   for i, row in enumerate(np.hstack((arr[:,0][:,None], arr[:,1:]- arr[0][0]))):

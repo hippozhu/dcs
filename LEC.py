@@ -30,7 +30,7 @@ def compute_lec_test(neigh_test, pp_test, pp_train):
 class LEC:
   def __init__(self, clf, k, l):
     self.clf = clf
-    self.clf_orig = copy.deepcopy(clf)
+    #self.clf_orig = copy.deepcopy(clf)
     self.k = k
     self.l = l
     self.ww = []
@@ -44,6 +44,7 @@ class LEC:
     self.n_train = self.y_train.shape[0]
     self.n_iter_total = 0
     self.sample_weight = np.ones((len(self.clf.estimators_), self.y_train.shape[0]))
+    return self
     
   def update_input(self, M):
     if M is None:

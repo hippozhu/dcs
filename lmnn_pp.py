@@ -6,12 +6,7 @@ import itertools
 from numpy import linalg as LA
 
 class LMNN_PP:
-  def __init__(self,
-               k=3,
-	       alpha=1e-5,
-	       mu=0.5,
-	       c=0.01,
-	       v=0.3):
+  def __init__(self, k, alpha, mu, c, v):
     self.k = k
     self.mu = mu
     self.alpha= alpha
@@ -26,8 +21,8 @@ class LMNN_PP:
     self.y_test = y[test]
     self.M = np.eye(self.X_train.shape[1])
     self.n_iter_total = 0
-    self.mm = []
     self.stats= []
+    return self
 
   def update_input(self, clf):
     preds_train = np.array([e.predict(self.X_train) for e in clf.estimators_]).T
@@ -46,8 +41,9 @@ class LMNN_PP:
       #self.pd_pp_val = pairwise_distances(self.pp_val, self.pp_train, metric='hamming')
     self.pd_pp_test = pairwise_distances(self.pp_test, self.pp_train, metric='hamming')
 
-  def fit(self, max_iter, ff):
+  def fit(self, max_iter):
     # update M iteratively
+    self.mm = []
     for n_iter in xrange(max_iter):
       self.n_iter_total += 1
       self.pd_X = np.square(\
@@ -132,7 +128,7 @@ class LMNN_PP:
 
       # report status periodically
       if self.n_iter_total % 10 == 0:
-	print 'fold', ff
+	#print 'fold', ff
         self.report()
 
       # stop if step size too small
@@ -198,13 +194,6 @@ class LMNN_PP:
     #pd_pp_neigh = np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp, knn))
     #p_target_train = (pd_pp_neigh < self.v).mean()
     p_target_val = .0
-    '''
-    if self.X_val is not None:
-      _, knn = NearestNeighbors(self.k, algorithm='brute', metric='mahalanobis', VI=self.M).fit(self.X_train).kneighbors(self.X_val)
-      pd_pp_neigh = np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp_val, knn))
-      p_target_val = (pd_pp_neigh < self.v).mean()
-    _, knn = NearestNeighbors(2*self.k, algorithm='brute', metric='mahalanobis', VI=self.M).fit(self.X_train).kneighbors(self.X_test)
-    '''
     p_target_test = np.array([(np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp_test, knn[:, :k]))<self.v).mean() for k in xrange(1, 2*self.k, 2)])
     #pd_pp_neigh = np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp_test, knn))
     #p_target_test = (pd_pp_neigh < self.v).mean()
