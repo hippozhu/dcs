@@ -119,3 +119,9 @@ def max_diff(arr):
   max_val = arr_diff.max()
   max_arg = arr_diff.argmax()
   print '%.2f, (%d, %d)' %(100*max_val, max_arg/arr_diff.shape[1], max_arg%arr_diff.shape[1])
+
+def max_coordinate(arr):
+  max_val = np.max(arr)
+  max_arg = np.argmax(arr)
+  print '%.2f, (%d, %d)' %(100*max_val, max_arg/np.array(arr).shape[1], max_arg%np.array(arr).shape[1])
+

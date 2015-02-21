@@ -21,6 +21,7 @@ class LMNN_PP:
     self.y_test = y[test]
     self.M = np.eye(self.X_train.shape[1])
     self.n_iter_total = 0
+    self.final_iter_total = -1
     self.stats= []
     return self
 
@@ -45,7 +46,8 @@ class LMNN_PP:
     # update M iteratively
     self.mm = []
     for n_iter in xrange(max_iter):
-      self.n_iter_total += 1
+      if self.final_iter_total > 0:
+        continue
       self.pd_X = np.square(\
       pairwise_distances(self.X_train, metric='mahalanobis', VI=self.M))
       np.fill_diagonal(self.pd_X, np.inf)
@@ -54,7 +56,8 @@ class LMNN_PP:
       #	pairwise_distances(self.X_val, self.X_train, metric='mahalanobis', VI=self.M))
       diff_G = np.zeros(self.M.shape)
       new_ijl = None
-      if n_iter%10 == 0:
+      #if n_iter%(max_iter/10) == 0:
+      if self.n_iter_total%10 == 0:
 	#if n_iter+self.n_iter_total == 0:
 	if True:
 	  #initialize targets and impostors
@@ -117,6 +120,7 @@ class LMNN_PP:
         w[negatives] = .0
 	self.M = V.dot(np.diagflat(w)).dot(LA.inv(V))
 
+      # assert False
       # evalute loss function
       loss = self.evaluate_loss_function()
 
@@ -126,21 +130,32 @@ class LMNN_PP:
 	self.alpha /= 10
       self.loss = loss
 
+      self.n_iter_total += 1
+
       # report status periodically
-      if self.n_iter_total % 10 == 0:
-	#print 'fold', ff
+      # if self.n_iter_total % (max_iter/10) == 0:
+      if self.n_iter_total % 20  == 0:
+	# print 'fold', ff
         self.report()
 
       # stop if step size too small
       if self.alpha < 1e-8:
 	print 'step size break'
-        break
+	self.final_iter_total = self.n_iter_total
+
+    del self.ij
+    del self.ijl
+    del self.active_set
+    del self.pp_train
+    del self.pp_test
+    del self.pd_pp
+    del self.pd_pp_test
 
   def report(self):
     p_target_train, p_target_val, p_target_test = self.neigh_pp_mean()
     print self.n_iter_total, 'ijl: %d\t%.2f, %.4f, p_target:%.4f,%.4f'\
     %(len(self.ijl), self.loss, self.M.mean(), p_target_train[self.k/2], p_target_test[self.k/2])
-    self.stats.append((len(self.ijl), self.loss, self.M.mean(), p_target_train, p_target_test))
+    self.stats.append((len(self.ijl), self.loss, self.M.mean(), p_target_train[self.k/2], p_target_test[self.k/2]))
     self.mm.append(self.M.copy())
     
   def _select_targets_impostors_pool(self, v, c):
