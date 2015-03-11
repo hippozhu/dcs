@@ -29,7 +29,7 @@ def run_lmnn(lmnns, lecs, max_iter):
   return mm
 
 def des_test_lmnn(lmnn_clf):
-  k = 20
+  k = 50
   lmnn, lec = lmnn_clf
   if np.array_equal(lmnn.M, np.eye(lmnn.M.shape[0])):
     return des_test(lmnn.X_train, lmnn.y_train, lmnn.X_test, lmnn.y_test, lec.clf, k)
@@ -40,7 +40,7 @@ def des_test_lmnn(lmnn_clf):
       return [des_test(lmnn.X_train, lmnn.y_train, lmnn.X_test, lmnn.y_test, lec.clf, k, M) for M in lmnn.mm]
 
 def des_test_lec(lmnn_lec):
-  k = 20
+  k = 50
   lmnn, lec = lmnn_lec
   return [des_test(lmnn.X_train, lmnn.y_train, lmnn.X_test, lmnn.y_test, clf, k, lmnn.M) for clf in lec.clfs]
 
@@ -70,7 +70,7 @@ def calc_des_lec(lmnns, lecs):
   return acc
   
 def des_test_all(lmnn_lec):
-  k = 20
+  k = 50
   lmnn, lec = lmnn_lec
   return des_test(lmnn.X_train, lmnn.y_train, lmnn.X_test, lmnn.y_test, lec.clf, k, lmnn.M)
 
@@ -88,16 +88,26 @@ def alternate(lmnns, n_iter_lmnn, lecs, n_iter_lec, n_iter):
     acc.append(calc_des(lmnns, lecs))
     lecs = run_lec(lecs, lmnns, n_iter_lec)
     acc.append(calc_des(lmnns, lecs))
-  return acc, lmnns, le  
+  return acc, lmnns, lecs
 
 if __name__ == '__main__':
   folds = pickle.load(open('folds.pickle', 'rb'))
   C = pickle.load(open('C.pickle', 'rb'))
   acc_0 = pickle.load(open('acc_0.pickle', 'rb'))
+  '''
+  folds, C, acc_0 = pickle.load(open('Ionosphere.pickle', 'rb'))
+  '''
 
-  k = 13;mu=0.5;c=1;v=0.4;l=0.05
+  mu=0.5;c=1
+  k, v, l = 20, 0.4, 0.05
+  #ss_lmnn, ss_lec, n_step = 10, 10, 100
+  ss_lmnn, ss_lec, n_step = 20, 20, 50 
+
   X, y = loadPima()
+  #X, y = loadIonosphere()
   lmnns = [LMNN_PP(k=k, alpha=1e-5, mu=mu, c=c, v=v).init_input(X, y, train, test) for train,test in folds]
   lecs = [LEC(clf, k, l).init_input(X, y, train, test) for clf, (train, test) in itertools.izip(C, folds)]
-  acc = alternate(lmnns, 10, lecs, 10, 50)
-  #pickle.dump(acc, open('acc.pickle', 'wb'))
+
+  #acc, lmnns, lecs = alternate(lmnns, 40, lecs, 20, 1)
+  acc1, lmnns1, lecs1 = alternate(lmnns, ss_lmnn, lecs, ss_lec, n_step)
+

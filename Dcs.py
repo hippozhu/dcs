@@ -110,9 +110,10 @@ def des_test(X_train, y_train, X_test, y_test, clf, k, M=None):
     la_ranking, cla_ranking, lap_ranking = des.dcsla(knn)
     #for p in [70, 50, 30, 10]:
     #  pred.append(des.ensemble_predict(la_ranking, pct=p))
-    # for n in [1, 2, 5, 10, 20, 50, 100, 150, 200, 250]:
-    # for n in [1, 3, 5, 7, 9, 11, 13, 15, 17]:
-    for n in [clf.n_estimators*i/10 for i in xrange(1, 10)]:
+    pn_list = [clf.n_estimators*i/10 for i in xrange(1, 10)]
+    if pn_list[0]>5:
+      pn_list = pn_list + [1, 2, 5]
+    for n in pn_list:
       pred.append(des.ensemble_predict(la_ranking, topn=n))
       #pred.append(des.ensemble_predict(cla_ranking, p))
     acc.append(np.apply_along_axis(accuracy_score, 1, pred, y_test))

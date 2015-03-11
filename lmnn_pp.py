@@ -13,7 +13,6 @@ class LMNN_PP:
     self.c = c
     self.v = v
 
-  #def process_input(self, X_train, y_train, pp_train, X_test, y_test, pp_test):
   def init_input(self, X, y, train, test):
     self.X_train = X[train]
     self.y_train = y[train]
@@ -21,7 +20,7 @@ class LMNN_PP:
     self.y_test = y[test]
     self.M = np.eye(self.X_train.shape[1])
     self.n_iter_total = 0
-    self.final_iter_total = -1
+    self.final_iter_total = []
     self.stats= []
     return self
 
@@ -37,27 +36,24 @@ class LMNN_PP:
     self.loss = np.inf
     self.pd_pp = pairwise_distances(self.pp_train, metric='hamming')
     np.fill_diagonal(self.pd_pp, np.inf)
-    #if self.X_val is not None:
-      #self.pp_val = pp_val
-      #self.pd_pp_val = pairwise_distances(self.pp_val, self.pp_train, metric='hamming')
     self.pd_pp_test = pairwise_distances(self.pp_test, self.pp_train, metric='hamming')
+    self.step_size = self.alpha
+    self.step_size_break = False
+    self.mm = []
 
   def fit(self, max_iter):
     # update M iteratively
-    self.mm = []
     for n_iter in xrange(max_iter):
-      if self.final_iter_total > 0:
+      #if self.final_iter_total > 0:
+      if self.step_size_break:
         continue
       self.pd_X = np.square(\
       pairwise_distances(self.X_train, metric='mahalanobis', VI=self.M))
       np.fill_diagonal(self.pd_X, np.inf)
-      #if self.X_val is not None:
-      #  self.pd_X_val = np.square(\
-      #	pairwise_distances(self.X_val, self.X_train, metric='mahalanobis', VI=self.M))
       diff_G = np.zeros(self.M.shape)
       new_ijl = None
       #if n_iter%(max_iter/10) == 0:
-      if self.n_iter_total%10 == 0:
+      if n_iter==0 or self.n_iter_total%min(10, max_iter)==0:
 	#if n_iter+self.n_iter_total == 0:
 	if True:
 	  #initialize targets and impostors
@@ -111,7 +107,7 @@ class LMNN_PP:
 
       # update M
       self.G += diff_G
-      self.M -= self.alpha*self.G
+      self.M -= self.step_size*self.G
 
       # projection to psd cone
       w, V = LA.eig(self.M)
@@ -120,29 +116,28 @@ class LMNN_PP:
         w[negatives] = .0
 	self.M = V.dot(np.diagflat(w)).dot(LA.inv(V))
 
-      # assert False
       # evalute loss function
       loss = self.evaluate_loss_function()
 
       if loss < self.loss:
-	self.alpha *= 1.1
+	self.step_size*= 1.1
       else:
-	self.alpha /= 10
+	self.step_size/= 10
       self.loss = loss
 
       self.n_iter_total += 1
 
       # report status periodically
-      # if self.n_iter_total % (max_iter/10) == 0:
-      if self.n_iter_total % 20  == 0:
-	# print 'fold', ff
-        self.report()
+      # if self.n_iter_total % 10 == 0:
+      #  self.report()
 
       # stop if step size too small
-      if self.alpha < 1e-8:
+      if self.step_size < 1e-8:
 	print 'step size break'
-	self.final_iter_total = self.n_iter_total
+	self.final_iter_total.append(self.n_iter_total)
+	self.step_size_break = True
 
+    self.report()
     del self.ij
     del self.ijl
     del self.active_set
@@ -153,8 +148,9 @@ class LMNN_PP:
 
   def report(self):
     p_target_train, p_target_val, p_target_test = self.neigh_pp_mean()
-    print self.n_iter_total, 'ijl: %d\t%.2f, %.4f, p_target:%.4f,%.4f'\
-    %(len(self.ijl), self.loss, self.M.mean(), p_target_train[self.k/2], p_target_test[self.k/2])
+    if self.n_iter_total % 20  == 0:
+      print self.n_iter_total, 'ijl: %d\t%.2f, %.4f, p_target:%.4f,%.4f'\
+      %(len(self.ijl), self.loss, self.M.mean(), p_target_train[self.k/2], p_target_test[self.k/2])
     self.stats.append((len(self.ijl), self.loss, self.M.mean(), p_target_train[self.k/2], p_target_test[self.k/2]))
     self.mm.append(self.M.copy())
     
@@ -253,4 +249,3 @@ def find_l(kvc_xp):
   for ti in target_inds:
     dict_jl[ti] = np.where((dist_x < dist_x[ti] + c) & (~similar))[0].tolist()
   return dict_jl
-

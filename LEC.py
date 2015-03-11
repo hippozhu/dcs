@@ -35,6 +35,7 @@ class LEC:
     self.l = l
     self.ww = []
     self.clfs = []
+    self.stats = []
     
   def init_input(self, X, y, train, test):
     self.X_train = X[train]
@@ -89,13 +90,14 @@ class LEC:
 	self.y_train[self.clf.estimators_samples_[i]],\
 	sample_weight=self.sample_weight[i, self.clf.estimators_samples_[i]])
 
-      #if self.n_iter_total % (max_iter/10) == 0:
-      if self.n_iter_total % 20 == 0:
+      if self.n_iter_total % 10 == 0:
         self.report()
 
 
   def report(self):
-    print '(%d):%.4f,%.4f (%d,%d,%d,%d)' %(self.n_iter_total, self.lec_train.mean(), self.lec_test.mean(), self.positive_lec_increment.sum(), self.to_be_adjusted.sum(), self.to_be_increased.sum(), self.to_be_decreased.sum())
+    self.stats.append((self.lec_train.mean(), self.lec_test.mean(), self.positive_lec_increment.sum(), self.to_be_adjusted.sum(), self.to_be_increased.sum(), self.to_be_decreased.sum()))
+    if self.n_iter_total % 20 == 0:
+      print '(%d):%.4f,%.4f (%d,%d,%d,%d)' %(self.n_iter_total, self.lec_train.mean(), self.lec_test.mean(), self.positive_lec_increment.sum(), self.to_be_adjusted.sum(), self.to_be_increased.sum(), self.to_be_decreased.sum())
     #self.ww.append(self.sample_weight.copy())
     #self.clfs.append(copy.deepcopy(self.clf))
 
