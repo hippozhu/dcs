@@ -56,7 +56,7 @@ def neighorbood_precision_proba(u, preds_proba_cr, pred_test):
 
 def neighorbood_accuracy_proba(preds_proba_cr, yy_cr):
   return np.array([[pp[yy] for pp, yy in itertools.izip(p, yy_cr)] for p in preds_proba_cr]).mean(axis=1)
-
+'''
 class DCSLA:
   def __init__(self, preds_cr, preds_proba_cr, y_cr, preds_test, cr):
     self.preds_cr = preds_cr
@@ -82,3 +82,4 @@ class DCSLA:
   def class_local_accuracy_proba(self, classes):
     cla = np.array([neighorbood_precision(np.array([self.y_cr[region]==c for c in classes]), self.preds_cr[region].T, self.preds_test[i]) for i, region in enumerate(self.cr)])
     return cla
+''' 

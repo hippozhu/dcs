@@ -1,5 +1,6 @@
 from lmnn_pp import *
 from LEC import *
+from DES import *
 from sklearn.cross_validation import cross_val_score
 
 def train_lmnn(lmnn_lec):
