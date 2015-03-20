@@ -1,10 +1,9 @@
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
-from sklearn.svm import SVC
 import itertools
 import copy
 from scipy.stats import rankdata
-from Dcs import *
+#from Dcs import *
 
 def find_in_neighborhood(neighborhoods, performance):
   n_target = neighborhoods.shape[0]
@@ -55,15 +54,13 @@ class LEC:
       self.neigh_train = NearestNeighbors(self.k+1, metric='mahalanobis', algorithm='brute', VI=M).fit(self.X_train).kneighbors(self.X_train, return_distance=False)[:,1:]
       self.neigh_test = NearestNeighbors(self.k, metric='mahalanobis', algorithm='brute', VI=M).fit(self.X_train).kneighbors(self.X_test, return_distance=False)
 
-  def fit(self, max_iter):
-    for _ in xrange(max_iter):
-      self.n_iter_total += 1
-      #des_acc = des_test(self.X_train, self.y_train, self.X_test, self.y_test, self.clf, self.k)
+    self.update_lec()
+
+  def update_lec(self):
       preds_train = np.array([e.predict(self.X_train) for e in self.clf.estimators_]).T;pp_train = np.array([pt==yt for pt,yt in itertools.izip(preds_train, self.y_train)])
       preds_test = np.array([e.predict(self.X_test) for e in self.clf.estimators_]).T;pp_test = np.array([pt==yt for pt,yt in itertools.izip(preds_test, self.y_test)])
       self.lec_increment, self.lec_train = compute_lec_increment(self.neigh_train, pp_train)
       self.lec_test = compute_lec_test(self.neigh_test, pp_test, pp_train)
-
       preds_proba_train = np.array([e.predict_proba(self.X_train) for e in self.clf.estimators_])
       closeness = np.abs(preds_proba_train[:,:,0]-preds_proba_train[:,:,1])
       close = closeness<self.l
@@ -74,15 +71,19 @@ class LEC:
       self.to_be_increased = self.to_be_adjusted & (~pp_train.T)
       self.to_be_decreased = self.to_be_adjusted & pp_train.T
 
+  def fit(self, max_iter):
+    for _ in xrange(max_iter):
+      self.n_iter_total += 1
+
       error_rate = 1-np.array([e.score(self.X_train, self.y_train) for e in self.clf.estimators_])
       alpha = np.sqrt(error_rate/(1-error_rate)) # alpha < 1
       for i, (inc, dec) in enumerate(itertools.izip(self.to_be_increased, self.to_be_decreased)):
 	if inc.sum() > 0:
 	  #sample_weight[i,inc] = sample_weight[i,inc]/alpha[i]
-	  self.sample_weight[i,inc] = self.sample_weight[i,inc]*1.01
+	  self.sample_weight[i,inc] = self.sample_weight[i,inc]*1.001
 	if dec.sum() > 0:
 	  #sample_weight[i,dec] = sample_weight[i,dec]*alpha[i]
-	  self.sample_weight[i,dec] = self.sample_weight[i,dec]/1.01
+	  self.sample_weight[i,dec] = self.sample_weight[i,dec]/1.001
 
       # update individual classifiers by re-training with new sample weights
       for i, e in enumerate(self.clf.estimators_):
@@ -90,14 +91,10 @@ class LEC:
 	self.y_train[self.clf.estimators_samples_[i]],\
 	sample_weight=self.sample_weight[i, self.clf.estimators_samples_[i]])
 
-      if self.n_iter_total % 10 == 0:
-        self.report()
-
+      self.update_lec()
 
   def report(self):
-    self.stats.append((self.lec_train.mean(), self.lec_test.mean(), self.positive_lec_increment.sum(), self.to_be_adjusted.sum(), self.to_be_increased.sum(), self.to_be_decreased.sum()))
-    if self.n_iter_total % 20 == 0:
+    if self.n_iter_total % 10 == 0:
       print '(%d):%.4f,%.4f (%d,%d,%d,%d)' %(self.n_iter_total, self.lec_train.mean(), self.lec_test.mean(), self.positive_lec_increment.sum(), self.to_be_adjusted.sum(), self.to_be_increased.sum(), self.to_be_decreased.sum())
-    #self.ww.append(self.sample_weight.copy())
-    #self.clfs.append(copy.deepcopy(self.clf))
+    return self.lec_train.mean(), self.lec_test.mean(), self.positive_lec_increment.sum(), self.to_be_adjusted.sum(), self.to_be_increased.sum(), self.to_be_decreased.sum()
 

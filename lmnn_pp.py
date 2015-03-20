@@ -21,7 +21,7 @@ class LMNN_PP:
     self.M = np.eye(self.X_train.shape[1])
     self.n_iter_total = 0
     self.final_iter_total = []
-    self.stats= []
+    #self.stats= []
     return self
 
   def update_input(self, clf):
@@ -39,7 +39,7 @@ class LMNN_PP:
     self.pd_pp_test = pairwise_distances(self.pp_test, self.pp_train, metric='hamming')
     self.step_size = self.alpha
     self.step_size_break = False
-    self.mm = []
+    #self.mm = []
 
   def fit(self, max_iter):
     # update M iteratively
@@ -127,17 +127,14 @@ class LMNN_PP:
 
       self.n_iter_total += 1
 
-      # report status periodically
-      # if self.n_iter_total % 10 == 0:
-      #  self.report()
-
       # stop if step size too small
       if self.step_size < 1e-8:
 	print 'step size break'
 	self.final_iter_total.append(self.n_iter_total)
 	self.step_size_break = True
 
-    self.report()
+    #self.report()
+  def clean(self):
     del self.ij
     del self.ijl
     del self.active_set
@@ -147,12 +144,13 @@ class LMNN_PP:
     del self.pd_pp_test
 
   def report(self):
-    p_target_train, p_target_val, p_target_test = self.neigh_pp_mean()
-    if self.n_iter_total % 20  == 0:
+    p_target_train, p_target_test = self.neigh_pp_mean()
+    if self.n_iter_total % 10  == 0:
       print self.n_iter_total, 'ijl: %d\t%.2f, %.4f, p_target:%.4f,%.4f'\
-      %(len(self.ijl), self.loss, self.M.mean(), p_target_train[self.k/2], p_target_test[self.k/2])
-    self.stats.append((len(self.ijl), self.loss, self.M.mean(), p_target_train[self.k/2], p_target_test[self.k/2]))
-    self.mm.append(self.M.copy())
+      %(len(self.ijl), self.loss, self.M.mean(), p_target_train, p_target_test)
+    return len(self.ijl), self.loss, self.M.mean(), p_target_train, p_target_test
+    #self.stats.append((len(self.ijl), self.loss, self.M.mean(), p_target_train, p_target_test))
+    #self.mm.append(self.M.copy())
     
   def _select_targets_impostors_pool(self, v, c):
     pool = Pool(10)
@@ -199,16 +197,11 @@ class LMNN_PP:
     return loss
 
   def neigh_pp_mean(self):
-    _, knn = NearestNeighbors(2*self.k+1, algorithm='brute', metric='mahalanobis', VI=self.M).fit(self.X_train).kneighbors(self.X_train)
+    _, knn = NearestNeighbors(self.k+1, algorithm='brute', metric='mahalanobis', VI=self.M).fit(self.X_train).kneighbors(self.X_train)
     knn = knn[:,1:]
-    p_target_train = np.array([(np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp, knn[:, :k]))<self.v).mean() for k in xrange(1, 2*self.k, 2)])
-    #pd_pp_neigh = np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp, knn))
-    #p_target_train = (pd_pp_neigh < self.v).mean()
-    p_target_val = .0
-    p_target_test = np.array([(np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp_test, knn[:, :k]))<self.v).mean() for k in xrange(1, 2*self.k, 2)])
-    #pd_pp_neigh = np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp_test, knn))
-    #p_target_test = (pd_pp_neigh < self.v).mean()
-    return p_target_train, p_target_val, p_target_test
+    p_target_train = (np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp, knn))<self.v).mean()
+    p_target_test = (np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp_test, knn))<self.v).mean()
+    return p_target_train, p_target_test
   
 def sum_outer_product(X, I, J, pp_weight):
   if pp_weight is None:

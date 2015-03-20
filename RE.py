@@ -1,13 +1,19 @@
 from lmnn_pp import *
 from LEC import *
 from DES import *
-from sklearn.cross_validation import cross_val_score
 
 def train_lmnn(lmnn_lec):
   lmnn, lec, max_iter = lmnn_lec
   lmnn.update_input(lec.clf)
   lmnn.fit(max_iter)
   return lmnn
+
+def run_lmnn(lmnns, lecs, max_iter):
+  pool = Pool(10)
+  new_lmnns = pool.map(train_lmnn, itertools.izip(lmnns, lecs, itertools.repeat(max_iter)), chunksize=1)
+  pool.close()
+  pool.join()
+  return new_lmnns
 
 def train_lec(lec_lmnn):
   lec, lmnn, max_iter = lec_lmnn
@@ -21,13 +27,6 @@ def run_lec(lecs, lmnns, max_iter):
   pool.close()
   pool.join()
   return rr
-
-def run_lmnn(lmnns, lecs, max_iter):
-  pool = Pool(10)
-  mm = pool.map(train_lmnn, itertools.izip(lmnns, lecs, itertools.repeat(max_iter)), chunksize=1)
-  pool.close()
-  pool.join()
-  return mm
 
 def des_test_lmnn(lmnn_clf):
   k = 50

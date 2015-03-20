@@ -2,10 +2,7 @@ import itertools
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics import pairwise_distances
-
 from KNORA import KNORA
-
-max_k = 51
 
 class DES_BASE:
   def __init__(self, lmnn, lec):
@@ -40,7 +37,7 @@ class DES_BASE:
       ktb[nn] = True
     mcb_similar_neigh = np.logical_and(knn_test_bool, self.pd_pp_test <= v)
     empty_neigh_idx = np.where(~mcb_similar_neigh.any(axis=1))[0]
-    print mcb_similar_neigh.sum(), empty_neigh_idx.shape[0]
+    #print mcb_similar_neigh.sum(), empty_neigh_idx.shape[0]
     for i in empty_neigh_idx:
       mcb_similar_neigh[i] = knn_test_bool[i]
     return self.local_accuracy(mcb_similar_neigh)
@@ -118,11 +115,7 @@ class DES_BASE:
       preds[key] = np.array([self.predict(self.select_ensemble(ranking, topn=n)) for n in xrange(1, self.clfs.n_estimators)])
 
     ensemble_kne, ensemble_knu = self.knora()
-    preds['kne'] = self.predict(ensemble_kne)
-    preds['knu'] = self.predict(ensemble_knu)
+    preds['kne'] = np.tile(self.predict(ensemble_kne), (self.clfs.n_estimators-1, 1))
+    preds['knu'] = np.tile(self.predict(ensemble_knu), (self.clfs.n_estimators-1, 1))
     return preds
 
-def des_evaluate(lmnn, lec):
-  des = DES_BASE(lmnn, lec)
-  preds = des.pred_all()
-  return preds
