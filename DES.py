@@ -25,6 +25,7 @@ class DES_BASE:
     self.knn_test_dist, self.knn_test =  NearestNeighbors(self.k,  algorithm='brute', metric='mahalanobis', VI=self.M).fit(self.X_train).kneighbors(self.X_test)
     self.preds_train = np.array([e.predict(self.X_train) for e in clfs]).T
     self.preds_proba_train = np.array([e.predict_proba(self.X_train) for e in clfs]).swapaxes(0,1)
+    self.preds_proba_train_smoothed = self.preds_proba_train + 0.01
     self.preds_test = np.array([e.predict(self.X_test) for e in clfs]).T
     self.preds_proba_test = np.array([e.predict_proba(self.X_test) for e in clfs]).swapaxes(0,1)
     self.pp_train = np.array([pt==yt for pt,yt in itertools.izip(self.preds_train, self.y_train)])
@@ -49,15 +50,19 @@ class DES_BASE:
     return self.class_local_accuracy(self.knn_test)
 
   def dcs_prior(self):
-    prior = np.array([[preds_proba[:, y] for preds_proba, y in itertools.izip(self.preds_proba_train[knn], self.y_train[knn])] for knn in self.knn_test])
+    prior = np.array([[preds_proba[:, y] for preds_proba, y in itertools.izip(self.preds_proba_train_smoothed[knn], self.y_train[knn])] for knn in self.knn_test])
     return np.vstack([d.dot(p)/d.sum() for d, p in itertools.izip(self.knn_test_dist, prior)])
 
   def dcs_posterior(self):
     posterior = []
+    #j = 0
     for knn, y_pred in itertools.izip(self.knn_test, self.preds_test):
-      aa = np.array([self.preds_proba_train[knn][:, i, y_pred[i]] for i in xrange(self.clfs.n_estimators)])
+      aa = np.array([self.preds_proba_train_smoothed[knn][:, i, y_pred[i]] for i in xrange(self.clfs.n_estimators)])
+      #if (aa.sum(axis=1)==0).sum()>0:
+      # print j
       bb = np.array([self.y_train[knn] == yy for yy in y_pred])
       posterior.append(np.array([aaa[bbb].sum()/aaa.sum() for aaa, bbb in itertools.izip(aa, bb)]))
+      #j += 1
     return np.array(posterior)
 
   def knora(self):

@@ -80,10 +80,10 @@ class LEC:
       for i, (inc, dec) in enumerate(itertools.izip(self.to_be_increased, self.to_be_decreased)):
 	if inc.sum() > 0:
 	  #sample_weight[i,inc] = sample_weight[i,inc]/alpha[i]
-	  self.sample_weight[i,inc] = self.sample_weight[i,inc]*1.001
+	  self.sample_weight[i,inc] = self.sample_weight[i,inc]*1.01
 	if dec.sum() > 0:
 	  #sample_weight[i,dec] = sample_weight[i,dec]*alpha[i]
-	  self.sample_weight[i,dec] = self.sample_weight[i,dec]/1.001
+	  self.sample_weight[i,dec] = self.sample_weight[i,dec]/1.01
 
       # update individual classifiers by re-training with new sample weights
       for i, e in enumerate(self.clf.estimators_):
