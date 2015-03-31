@@ -90,7 +90,7 @@ def lec_only(paras, X, y, folds, C):
 
 ############# LMNN_LEC ######################
 def lmnn_lec_combine(paras, X, y, folds, C):
-  step_size = [1,5,10]
+  step_size = [20]
   for step in step_size:
     paras['step'] = step
     niter = paras['niter_lmnn']/step
@@ -128,14 +128,17 @@ if __name__=='__main__':
            'step':5,
            'niter':40}
   #paras['ns'] = int(sys.argv[1])
-  X, y = loadPima()
+  X, y = loadIonosphere()
 
   #folds = [(tr, te) for tr, te in StratifiedKFold(y, nfold)]
-  folds = pickle.load(open('pima_folds'))
+  folds = pickle.load(open('iono_folds.pickle'))
 
   #C = [BaggingClassifier(base_estimator=SVC(kernel='linear', probability=True, C=5), n_estimators=paras['ns']).fit(X[train], y[train]) for train, test in folds]
   #C = [BaggingClassifier(DecisionTreeClassifier(max_depth=3), n_estimators=paras['ns']).fit(X[train], y[train]) for train, test in folds]
-  C = pickle.load(open('pima_C_dt_md3_ns50.pickle'))
+
+
+  C = pickle.load(open('iono_C_svmC1_ns50.pickle'))
+  #C = pickle.load(open('pima_C_dt_md3_ns50.pickle'))
   #C = pickle.load(open('pima_C_svm_C5_ns50.pickle'))
 
   bagging_acc = np.array([accuracy_score(y[folds[i][1]], C[i].predict(X[folds[i][1]])) for i in xrange(nfold)]).mean()
@@ -145,14 +148,3 @@ if __name__=='__main__':
     lmnn_only(paras, X, y, folds, C)
     lec_only(paras, X, y, folds, C)
     lmnn_lec_combine(paras, X, y, folds, C)
-
-    '''
-    K = range(1,20,2)
-    V = [0.1,0.2,0.3,0.4]
-    L = [float(sys.argv[1])]
-
-    for k, l in itertools.product(K, L):
-      paras['k'], paras['l'] = k, l
-      lec_only(paras, X, y, folds, C)
-    #lmnn_lec_combine(paras, X, y, folds, C)
-    '''

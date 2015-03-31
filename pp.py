@@ -44,32 +44,31 @@ def plot_pickle(filename):
       #plt.clf()
       plt.axhline(y=bagging_acc)
       for i in xrange(j, min(j+group_size, nk)):
-        plt.plot(np.arange(0, niter), acc[kk][:,i], linewidth=1,label='k=%d'%(i+1))
-        plt.annotate('%0.3f(@%d,k=%d)' %(acc[kk][:,i].max(), acc[kk][:,i].argmax(), i+1), size='small', weight='bold', xy=(acc[kk][:,i].argmax(), acc[kk][:,i].max()), xytext=(-30,30), xycoords=('data', 'data'), textcoords='offset points', arrowprops=dict(arrowstyle="-|>", fc="w"))
+        current_acc = acc[kk][:,i]
+        current_acc_max = current_acc.max()
+        current_acc_argmax = current_acc.argmax()
+        plt.plot(np.arange(0, niter), current_acc, linewidth=1,label='k=%d(%.3f@%d)'%(i+1, current_acc_max, current_acc_argmax))
+        plt.annotate('%0.3f(@%d,k=%d)' %(current_acc_max, current_acc_argmax, i+1), size='small', weight='bold', xy=(current_acc_argmax, current_acc_max), xytext=(-30,30), xycoords=('data', 'data'), textcoords='offset points', arrowprops=dict(arrowstyle="-|>", fc="w"))
       plt.legend(loc=4)
       if 'lmnn_only' in filename:
         plt.title('k=%d, v=%.2f' %(paras['k'], paras['v']))
       elif 'lec_only' in filename:
         plt.title('k=%d, l=%.2f' %(paras['k'], paras['l']))
       else:
-        s = int(re.search(r"step(\d+)", filename).groups()[0])
-        plt.title('k=%d, v=%.2f, l=%.2f, s=%d' %(paras['k'], paras['v'], paras['l'], s))
+        #s = int(re.search(r"step(\d+)", filename).groups()[0])
+        plt.title('k=%d, v=%.2f, l=%.2f, s=%d' %(paras['k'], paras['v'], paras['l'], paras['step']))
       figname = filename.split('/')[1][:-7]
-      plt.savefig('figs/%s_%s_%d-%d.png' %(figname, kk, j, min(j+group_size, nk)), format='png')
+      plt.savefig(fig_folder+'/%s_%s_%d-%d.png' %(figname, kk, j, min(j+group_size, nk)), format='png')
       plt.clf()
 
+pickle_folder = None
+fig_folder = None 
+
 if __name__=='__main__':
-  filenames = glob.glob('pickles/*.pickle')
-  pool = Pool(16)
+  pickle_folder = sys.argv[1]
+  fig_folder = sys.argv[2]
+  filenames = glob.glob(pickle_folder+'/*.pickle')
+  pool = Pool(int(sys.argv[3]))
   pool.map(plot_pickle, filenames)
   pool.close()
   pool.join()
-  #folder = sys.argv[1]
-  #K = range(1,20,2)
-  #K = [19] 
-  #L = [0.25, 0.3, 0.35, 0.4]
-  #filenames = ['lec_only_k%dl%.2fns50' %(k, l) for k, l in itertools.product(K, L)]
-  #V = [0.1,0.2,0.3,0.4]
-  #filenames = ['lmnn_only_k%dv%.2fns50' %(k, v) for k, v in itertools.product(K, V)]
-  #os.mkdir(folder+'_png')
-  #pool.map(plot_png, itertools.izip(itertools.repeat(folder), filenames))
