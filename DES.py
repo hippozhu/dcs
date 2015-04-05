@@ -17,11 +17,6 @@ class DES_BASE:
     self.clfs = clfs
     self.M = M
 
-    '''
-    _, knn_train =  NearestNeighbors(max_k+1,  algorithm='brute', metric='mahalanobis', VI=self.M).fit(self.X_train).kneighbors(self.X_train)
-    self.knn_train = knn_train[:,1:]
-    self.knn_test_bool =  np.array(NearestNeighbors(max_k,  algorithm='brute', metric='mahalanobis', VI=self.M).fit(self.X_train).kneighbors_graph(self.X_test).toarray(), dtype=bool)
-    '''
     self.knn_test_dist, self.knn_test =  NearestNeighbors(self.k,  algorithm='brute', metric='mahalanobis', VI=self.M).fit(self.X_train).kneighbors(self.X_test)
     self.preds_train = np.array([e.predict(self.X_train) for e in clfs]).T
     self.preds_proba_train = np.array([e.predict_proba(self.X_train) for e in clfs]).swapaxes(0,1)
@@ -31,12 +26,14 @@ class DES_BASE:
     self.pp_train = np.array([pt==yt for pt,yt in itertools.izip(self.preds_train, self.y_train)])
     self.pp_test = np.array([pt==yt for pt,yt in itertools.izip(self.preds_test, self.y_test)])
     self.pd_pp_test = pairwise_distances(self.pp_test, self.pp_train, metric='hamming')
+    self.pd_preds_test = pairwise_distances(self.preds_test, self.preds_train, metric='hamming')
 
   def dcs_mcb(self, v):
     knn_test_bool = np.zeros((self.y_test.shape[0], self.y_train.shape[0]), dtype=bool)
     for ktb, nn in itertools.izip(knn_test_bool, self.knn_test):
       ktb[nn] = True
-    mcb_similar_neigh = np.logical_and(knn_test_bool, self.pd_pp_test <= v)
+    #mcb_similar_neigh = np.logical_and(knn_test_bool, self.pd_pp_test <= v)
+    mcb_similar_neigh = np.logical_and(knn_test_bool, self.pd_preds_test <= v)
     empty_neigh_idx = np.where(~mcb_similar_neigh.any(axis=1))[0]
     #print mcb_similar_neigh.sum(), empty_neigh_idx.shape[0]
     for i in empty_neigh_idx:
@@ -86,6 +83,9 @@ class DES_BASE:
     proba = np.array([preds[ensemble].mean(axis=0) for ensemble, preds in itertools.izip(ensembles, self.preds_proba_test)])
     return self.clfs.classes_.take(np.argmax(proba, axis=1), axis=0)
 
+  def predict_proba(self, ensembles, weights = None):
+    return np.array([preds[ensemble].mean(axis=0) for ensemble, preds in itertools.izip(ensembles, self.preds_proba_test)])
+
   def local_accuracy(self, regions):
     return np.vstack([self.pp_train[region].mean(axis=0) for region in regions])
 
@@ -99,7 +99,7 @@ class DES_BASE:
     b = (u[pred_test] & v).sum(axis=1)
     return np.divide(b, a)
 
-  def pred_all(self):
+  def pred_all(self, proba=True):
     preds = {}
     rankings = {'ola': self.dcs_ola(),\
                 'cla': self.dcs_cla(),\
@@ -117,10 +117,17 @@ class DES_BASE:
 		'mcb9': self.dcs_mcb(.45),
 		}
     for key, ranking in rankings.iteritems():
-      preds[key] = np.array([self.predict(self.select_ensemble(ranking, topn=n)) for n in xrange(1, self.clfs.n_estimators)])
+      if proba:
+        preds[key] = np.array([self.predict_proba(self.select_ensemble(ranking, topn=n)) for n in xrange(1, self.clfs.n_estimators)])
+      else:
+        preds[key] = np.array([self.predict(self.select_ensemble(ranking, topn=n)) for n in xrange(1, self.clfs.n_estimators)])
 
     ensemble_kne, ensemble_knu = self.knora()
-    preds['kne'] = np.tile(self.predict(ensemble_kne), (self.clfs.n_estimators-1, 1))
-    preds['knu'] = np.tile(self.predict(ensemble_knu), (self.clfs.n_estimators-1, 1))
+    if proba:
+      preds['kne'] = np.tile(self.predict_proba(ensemble_kne), (self.clfs.n_estimators-1, 1, 1))
+      preds['knu'] = np.tile(self.predict_proba(ensemble_knu), (self.clfs.n_estimators-1, 1, 1))
+    else:
+      preds['kne'] = np.tile(self.predict(ensemble_kne), (self.clfs.n_estimators-1, 1))
+      preds['knu'] = np.tile(self.predict(ensemble_knu), (self.clfs.n_estimators-1, 1))
     return preds
 

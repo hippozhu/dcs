@@ -161,7 +161,7 @@ class LMNN_PP:
 
   def _select_targets_impostors(self):
     results = []
-    arr_similar = self.pd_pp<self.v
+    arr_similar = self.pd_pp<=self.v
     for similar, dist_x, dist_p in itertools.izip(arr_similar, self.pd_X, self.pd_pp):
       if similar.sum()>=self.k:
         similar_inds,  = np.where(similar)
@@ -199,8 +199,8 @@ class LMNN_PP:
   def neigh_pp_mean(self):
     _, knn = NearestNeighbors(self.k+1, algorithm='brute', metric='mahalanobis', VI=self.M).fit(self.X_train).kneighbors(self.X_train)
     knn = knn[:,1:]
-    p_target_train = (np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp, knn))<self.v).mean()
-    p_target_test = (np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp_test, knn))<self.v).mean()
+    p_target_train = (np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp, knn))<=self.v).mean()
+    p_target_test = (np.vstack(pd_pp[nn] for pd_pp, nn in itertools.izip(self.pd_pp_test, knn))<=self.v).mean()
     return p_target_train, p_target_test
   
 def sum_outer_product(X, I, J, pp_weight):
@@ -222,7 +222,7 @@ def ijl_to_list(results):
 
 def find_ijl(kvc_xp):
   k, v, c, dist_x, dist_p = kvc_xp
-  similar = dist_p < v
+  similar = dist_p <= v
   if similar.sum()>=k:
     similar_inds,  = np.where(similar)
     target_inds = similar_inds[dist_x[similar].argsort()[:k]]
@@ -237,7 +237,7 @@ def find_ijl(kvc_xp):
 
 def find_l(kvc_xp):
   target_inds, v, c, dist_x, dist_p = kvc_xp
-  similar = dist_p < v
+  similar = dist_p <= v
   dict_jl = {}
   for ti in target_inds:
     dict_jl[ti] = np.where((dist_x < dist_x[ti] + c) & (~similar))[0].tolist()

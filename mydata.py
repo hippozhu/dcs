@@ -4,9 +4,6 @@ from sklearn.datasets import fetch_mldata
 from sklearn.cross_validation import StratifiedShuffleSplit
 from sklearn.cross_validation import StratifiedKFold
 
-dataset_name = None
-dataset_path = {'Bupa':'/home/yzhu7/data/uci/bupa.data'}
-
 def load_split_scale(data_file, delimiter=',', usecols=None, label_col=-1, skiprows=0):
   data = np.loadtxt(data_file, delimiter=delimiter, usecols=usecols, skiprows=skiprows)
   data = np.array(list(set(tuple(p) for p in data)))
@@ -19,50 +16,23 @@ def load_split_scale(data_file, delimiter=',', usecols=None, label_col=-1, skipr
   X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
   return X_scaled, y
   
-'''
-def loadDataSet(datasetname):
-  dataset_name = datasetname
-  data = np.loadtxt(dataset_path[datasetname], delimiter=',')
-  X = data[:, :-1]
-  X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
-  y = data[:, -1].astype(np.int32)
-  return X_scaled, y
-'''
-
 def loadPima():
   data_file = '/home/yzhu7/data/diabetes/pima-indians-diabetes.data'
   return load_split_scale(data_file)
 
 def loadBreastCancer():
-  data_file = '/home/yzhu7/data/uci/breast-cancer/breast-cancer-wisconsin.data.nomissing'
+  data_file = '/home/yzhu7/data/uci/breast-cancer/breast-cancer-wisconsin.data.nomissing.label_adjusted'
   return load_split_scale(data_file)
-  '''
-  dataset_name = 'Breast Cancer'
-  data = np.loadtxt('/home/yzhu7/data/uci/breast-cancer/breast-cancer-wisconsin.data.nomissing', delimiter=',')
-  X = data[:, 1:-1]
-  X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
-  y = data[:, -1].astype(np.int32)
-  return X_scaled, y
-  '''
 
 def loadIonosphere():
   data_file = '/home/yzhu7/data/uci/ionosphere/ionosphere.data'
   return load_split_scale(data_file)
-  '''
-  dataset_name = 'Ionosphere'
-  data = np.loadtxt('/home/yzhu7/data/uci/ionosphere/ionosphere.data', delimiter=',')
-  X = data[:, 1:-1]
-  X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
-  y = data[:, -1].astype(np.int32)
-  return X_scaled, y
-  '''
 
 def loadIris():
-  dataset_name = 'Iris'
   iris = datasets.load_iris()
   X = iris.data[50:]
   X_scaled = preprocessing.MinMaxScaler().fit_transform(X)
-  y = iris.target[50:].astype(np.int32)
+  y = iris.target[50:].astype(np.int32)-1
   return X_scaled, y
 
 def loadGlass():
@@ -93,11 +63,31 @@ def loadSegmentation():
   data_file = '/home/yzhu7/data/uci/segmentation/segmentation.converted'
   return load_split_scale(data_file, label_col=0)
   
+def loadInflam():
+  data_file = '/home/yzhu7/data/uci/acute-inflammation/diagnosis.data'
+  return load_split_scale(data_file)
+
 def loadMnist():
   mnist = fetch_mldata('MNIST original')
   X = mnist.data
   y = mnist.target
   return X, y
+
+def loadAustralian():
+  data_file = '/home/yzhu7/data/uci/australian/australian.dat'
+  return load_split_scale(data_file, delimiter=' ')
+
+def loadHeart():
+  data_file = '/home/yzhu7/data/uci/heart/heart.data'
+  return load_split_scale(data_file, delimiter=' ')
+
+def loadHeartCleveland():
+  data_file = '/home/yzhu7/data/uci/heart-cleveland/heart-cleveland.data'
+  return load_split_scale(data_file)
+
+def loadBupa():
+  data_file = '/home/yzhu7/data/uci/bupa/bupa.data'
+  return load_split_scale(data_file)
 
 def train_val_test_split(y, nfold, test_size):
   skf = StratifiedKFold(y, nfold)
