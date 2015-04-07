@@ -77,6 +77,10 @@ def loadAustralian():
   data_file = '/home/yzhu7/data/uci/australian/australian.dat'
   return load_split_scale(data_file, delimiter=' ')
 
+def loadGerman():
+  data_file = '/home/yzhu7/data/uci/german/german.data'
+  return load_split_scale(data_file, delimiter=' ')
+
 def loadHeart():
   data_file = '/home/yzhu7/data/uci/heart/heart.data'
   return load_split_scale(data_file, delimiter=' ')

@@ -15,15 +15,15 @@ if __name__ == '__main__':
   K = range(1,20,2)
   #V = [0.1, 0.2, 0.4]
   #L = [0.05, 0.1, 0.3]
-  V = [0.2]
-  L = [0.3]
+  V = [0.4]
+  L = [0.4]
   kv_list = list(itertools.product(K, V))
   kl_list = list(itertools.product(K, L))
   kvl_list = list(itertools.product(K, V , L))
   #random.shuffle(kvl_list)
 
   nodes = ['gpu%02d' %i for i in xrange(5,12)]
-  #nodes = nodes[:3][::-1] + nodes
+  #nodes = nodes[:3] + nodes
   nodes = nodes + nodes[::-1]
 
   q_paras = multiprocessing.Queue()
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     for para in para_list:
       q_paras.put(para)
   else:
-    kvl_list = list(itertools.product(K, [0.2], [0.3]))[::-1]
+    kvl_list = list(itertools.product(K, [0.4], [0.4]))[::-1]
     for k,v,l in kvl_list:
       q_paras.put((k,v,l,dst_folder))
 
