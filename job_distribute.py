@@ -15,8 +15,8 @@ if __name__ == '__main__':
   K = range(1,20,2)
   #V = [0.1, 0.2, 0.4]
   #L = [0.05, 0.1, 0.3]
-  V = [0.4]
-  L = [0.4]
+  V = [0.2]
+  L = [0.1, 0.2, 0.4]
   kv_list = list(itertools.product(K, V))
   kl_list = list(itertools.product(K, L))
   kvl_list = list(itertools.product(K, V , L))
