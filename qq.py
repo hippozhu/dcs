@@ -96,10 +96,11 @@ class Results_Combine:
 
   def plot_all_best(self):
     for name, para, (k, n), rr in self.rr_list:
-      rr.plot_bar_scores(k, n, para, self.format)
-      rr.plot_n_effect(k, para, False, self.format)
-      rr.plot_k_effect(n, para, False, self.format)
-    self.plot_comp_best()
+      #rr.plot_bar_scores(k, n, para, self.format)
+      rr.plot_bar_scores_together(k, n, para, self.format)
+      rr.plot_n_effect_together(k, para, False, self.format)
+      rr.plot_k_effect_together(n, para, False, self.format)
+    self.plot_comp_best_together()
   
   def plot_table_all_best(self):
     self.plot_table_best('LEC')
@@ -123,6 +124,23 @@ class Results_Combine:
       prefix = self.dst + '/all_%s'%(sc)
       scores = np.vstack([self.des_scores_best[:,i], self.lec_scores_best[:,i], self.lmnn_scores_best[:,i], self.combine_scores_best[:,i]])
       plot_comp(scores, ['DES']+map(lambda x:x[0], self.rr_list), self.refs[:, i], ylabel, title, prefix, self.format)
+
+  def plot_comp_best_together(self):
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(14,7))
+    for i, sc in enumerate(scoring):
+      ax = axes[i/2, i%2]
+      ylabel = '%s scores' %sc
+      title = '%s scores comparison' %sc
+      prefix = self.dst + '/all_%s'%(sc)
+      scores = np.vstack([self.des_scores_best[:,i], self.lec_scores_best[:,i], self.lmnn_scores_best[:,i], self.combine_scores_best[:,i]])
+      plot_comp_together(ax, scores, ['DES']+map(lambda x:x[0], self.rr_list), self.refs[:, i], ylabel, title, prefix, self.format)
+      ax.text(.5,.9,'%s scores' %sc,
+      horizontalalignment='center', fontsize='medium',
+      transform=ax.transAxes)
+    plt.legend(fontsize='small', loc=8, bbox_to_anchor=(0., 2.13), ncol=7)
+    fig.tight_layout()
+    plt.savefig(self.dst+'/all_together.%s' %self.format, format=self.format, bbox_inches="tight")
+    plt.close()
 
   def get_performance_scores(self):
     k, n = self.rr_combine.select_kn()
@@ -267,7 +285,48 @@ class Results:
       ax.legend(loc=9, fontsize='medium', ncol=2)
       plt.savefig(self.dst+'/perform_%s_%s.%s'%(self.name, sc, output_format), format=output_format)
       plt.close()
-      #plt.show()
+
+  def plot_bar_scores_together(self, k, n, para, output_format):
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12,7))
+    for i, sc in enumerate(scoring):
+      ax = axes[i/2, i%2]
+      des_scores = [self.dict_scores[(k, para, method, n)][0][i] for method in methods]
+      winner_scores = [self.dict_scores[(k, para, method, n)][1][i] for method in methods]
+      #fig, ax = plt.subplots()
+      ind = np.arange(len(methods))
+      width = 0.4 
+      #width = 0.85/len(2)
+      rects_des = ax.bar(ind, des_scores, width, color='steelblue', label='DES')
+      rects_winner = ax.bar(ind+width, winner_scores, width, color='indianred', label='DES-%s'%self.name)
+      for rect_des, rect_winner in itertools.izip(rects_des, rects_winner):
+        height_des = rect_des.get_height()
+        height_winner = rect_winner.get_height()
+        ax.text(rect_winner.get_x()+rect_winner.get_width()/2., height_winner+0.002, '%.1f'%(100.0*(height_winner-height_des)), ha='center', va='bottom', fontsize='small')
+      #ax.set_ylabel('%s scores' %sc)
+      #ax.set_xlabel('DES models')
+      #ax.set_title('%s scores' %sc, fontsize='small')
+      ax.text(.5,.9,'%s scores' %sc,
+      horizontalalignment='center', fontsize='medium',
+      transform=ax.transAxes)
+      ax.set_xticks(ind+width)
+      ax.set_xticklabels(methods, fontsize='small')
+      score_min = np.min(des_scores+winner_scores+self.refs[:, i].tolist())
+      score_max = np.max(des_scores+winner_scores+self.refs[:, i].tolist())
+      score_diff = score_max - score_min
+      if score_min==np.min(self.refs[:, i].tolist()):
+        y_axis_bottom = score_min-score_diff*0.1
+      else:
+        y_axis_bottom = score_min-score_diff*0.5
+      ax.set_ylim(\
+      bottom=max(0, y_axis_bottom),\
+      top=score_max+score_diff*.5)
+      for j, (ref_name, ref_color) in enumerate(ref_names):
+        ax.axhline(self.refs[j, i], linewidth=2, label=ref_name, color=ref_color, ls=':')
+    #plt.legend(fontsize='small', loc='upper center', bbox_to_anchor=(-0.1, -0.1), ncol=5)
+    plt.legend(fontsize='small', loc=8, bbox_to_anchor=(0., 2.12), ncol=5)
+    fig.tight_layout()
+    plt.savefig(self.dst+'/perform_together_%s.%s'%(self.name, output_format), format=output_format, bbox_inches="tight")
+    plt.close()
 
   def plot_n_effect(self, k, para, include_ref, output_format):
     for i, sc in enumerate(scoring):
@@ -291,6 +350,26 @@ class Results:
       plt.savefig(self.dst+'/nn_%s_%s.%s'%(self.name, sc, output_format), format=output_format)
       plt.close()
 
+  def plot_n_effect_together(self, k, para, include_ref, output_format):
+    fig, axes = plt.subplots(nrows=4, figsize=(6,15), sharex=True)
+    for i, sc in enumerate(scoring):
+      ax = axes[i]
+      ax.set_ylabel('%s scores' %sc)
+      for method in methods:
+        if method=='kne':
+          continue
+        n_score = [self.dict_scores[(k, para, method, n)][1][i] for n in xrange(49)]
+        ax.plot(np.arange(49), n_score, linewidth=1, label=method)
+
+      if include_ref:
+        for j, (ref_name, ref_color) in enumerate(ref_names):
+          ax.axhline(self.refs[j, i], linewidth=3, label=ref_name, color=ref_color, ls=':')
+
+    plt.legend(fontsize='small', loc='upper center', bbox_to_anchor=(0.5, 4.5), ncol=5)
+    fig.tight_layout()
+    plt.savefig(self.dst+'/nn_together_%s.%s'%(self.name, output_format), format=output_format, bbox_inches="tight")
+    plt.close()
+
   def plot_k_effect(self, n, para, include_ref, output_format):
     for i, sc in enumerate(scoring):
       ylabel = '%s scores' %sc
@@ -310,6 +389,27 @@ class Results:
       plt.title(title)
       plt.savefig(self.dst+'/kk_%s_%s.%s'%(self.name, sc, output_format), format=output_format)
       plt.close()
+
+  def plot_k_effect_together(self, n, para, include_ref, output_format):
+    fig, axes = plt.subplots(nrows=4, figsize=(6,15), sharex=True)
+    for i, sc in enumerate(scoring):
+      ax = axes[i]
+      #ax.set_title('k v.s. %s scores' %sc)
+      ax.set_ylabel('%s scores' %sc)
+      for method in methods:
+        k_score = [self.dict_scores[(k, para, method, n)][1][i] for k in xrange(1, 20, 2)]
+        ax.plot(np.arange(1, 20, 2), k_score, linewidth=1, label=method)
+
+      if include_ref:
+        for j, (ref_name, ref_color) in enumerate(ref_names):
+          ax.axhline(self.refs[j, i], linewidth=3, label=ref_name, color=ref_color, ls=':')
+
+    #plt.legend(loc='lower right', fancybox=True, ncol=3, fontsize='small')
+    plt.legend(fontsize='small', loc='upper center', bbox_to_anchor=(0.5, 4.5), ncol=5)
+    fig.tight_layout()
+    plt.savefig(self.dst+'/kk_together_%s.%s'%(self.name, output_format), format=output_format, bbox_inches="tight")
+    plt.close()
+
 
   def plot_vl_effect(self, k, n):
     para_list = list(set(map(lambda x:x[1], self.dict_scores.keys())))
@@ -360,18 +460,54 @@ def plot_comp(scores, names, ref, ylabel, title, prefix, output_format):
   plt.clf()
   #plt.show()
 
+def plot_comp_together(ax, scores, names, ref, ylabel, title, prefix, output_format):
+  colors = itertools.cycle(excel_colors[:len(names)])
+  ind = np.arange(len(methods))
+  width = 0.85/len(scores)
+  for i in xrange(len(names)):
+    ax.bar(ind+i*width, scores[i], width, color=colors.next(), label=names[i])
+  if ref is not None: 
+    score_max = max(np.max(scores), np.max(ref))
+    score_min = min(np.min(scores), np.min(ref))
+    score_diff = score_max-score_min
+    if score_min==np.min(ref):
+      y_axis_bottom = score_min-score_diff*0.1
+    else:
+      y_axis_bottom = score_min-score_diff*0.3
+    for j, (ref_name, ref_color) in enumerate(ref_names):
+      ax.axhline(ref[j], linewidth=2, label=ref_name, color=ref_color, ls='--')
+  else:
+    score_max = np.max(scores)
+    score_min = np.min(scores)
+    score_diff = score_max-score_min
+    y_axis_bottom = score_min-score_diff*0.3
+  ax.set_ylim(bottom=max(0, y_axis_bottom), top=score_max+score_diff*.4)
+  ax.set_xticks(ind+len(names)*width/2)
+  ax.set_xticklabels(methods)
+
 def run_all():
-  rc = Results_Combine('results/pima_dt_md3', 0.4, 0.4, 5);rc.plot_all_best();rc.plot_table_all_best()
-  rc = Results_Combine('results/bupa_dt_md3', 0.2, 0.3, 5);rc.plot_all_best();rc.plot_table_all_best()
-  rc = Results_Combine('results/blood_svm_C1', 0.2, 0.3, 5);rc.plot_all_best();rc.plot_table_all_best()
-  rc = Results_Combine('results/breast_dt_md5/', 0.2, 0.1 , 5);rc.plot_all_best();rc.plot_table_all_best()
-  rc = Results_Combine('results/australian_dt_md3/', 0.2, 0.3, 5);rc.plot_all_best();rc.plot_table_all_best()
-  rc = Results_Combine('results/iono_dt_md5/', 0.2, 0.2, 5);rc.plot_all_best();rc.plot_table_all_best()
-  rc = Results_Combine('results/heart_dt_md3/', 0.2, 0.2, 5);rc.plot_all_best();rc.plot_table_all_best()
-  rc = Results_Combine('results/sonar_dt_md3/', 0.3, 0.3, 5);rc.plot_all_best();rc.plot_table_all_best()
-  rc = Results_Combine('results/heartcleveland_dt_md3/', 0.2, 0.2, 5);rc.plot_all_best();rc.plot_table_all_best()
-  rc = Results_Combine('results/iris_dt_md3/', 0.2, 0.1, 5);rc.plot_all_best();rc.plot_table_all_best()
-  rc = Results_Combine('results/german_dt_md3/', 0.3, 0.3, 5);rc.plot_all_best();rc.plot_table_all_best()
+  rc = Results_Combine('results/pima_dt_md3', 0.4, 0.4, 5);rc.plot_all_best()#;rc.plot_table_all_best()
+  print 'done'
+  rc = Results_Combine('results/bupa_dt_md3', 0.2, 0.3, 5);rc.plot_all_best()#;rc.plot_table_all_best()
+  print 'done'
+  rc = Results_Combine('results/blood_svm_C1', 0.2, 0.3, 5);rc.plot_all_best()#;rc.plot_table_all_best()
+  print 'done'
+  rc = Results_Combine('results/breast_dt_md5/', 0.2, 0.1 , 5);rc.plot_all_best()#;rc.plot_table_all_best()
+  print 'done'
+  rc = Results_Combine('results/australian_dt_md3/', 0.2, 0.3, 5);rc.plot_all_best()#;rc.plot_table_all_best()
+  print 'done'
+  rc = Results_Combine('results/iono_dt_md5/', 0.2, 0.2, 5);rc.plot_all_best()#;rc.plot_table_all_best()
+  print 'done'
+  rc = Results_Combine('results/heart_dt_md3/', 0.2, 0.2, 5);rc.plot_all_best()#;rc.plot_table_all_best()
+  print 'done'
+  rc = Results_Combine('results/sonar_dt_md3/', 0.3, 0.3, 5);rc.plot_all_best()#;rc.plot_table_all_best()
+  print 'done'
+  rc = Results_Combine('results/heartcleveland_dt_md3/', 0.2, 0.2, 5);rc.plot_all_best()#;rc.plot_table_all_best()
+  print 'done'
+  rc = Results_Combine('results/iris_dt_md3/', 0.2, 0.1, 5);rc.plot_all_best()#;rc.plot_table_all_best()
+  print 'done'
+  rc = Results_Combine('results/german_dt_md3/', 0.3, 0.3, 5);rc.plot_all_best()#;rc.plot_table_all_best()
+  print 'done'
 
 def get_ranks():
   dsts = [
@@ -424,13 +560,86 @@ def plot_rank(avg_rank, name):
     plt.savefig('results/rank_%s_%s.png'%(name, sc), format='png')
     plt.close()
 
+def remove_kne_box(ranks):
+  return np.hstack([ranks[:,:2], ranks[:,3:]])
+
+def color_box(bp, color):
+  for box, median, mean in itertools.izip(
+  bp['boxes'],
+  bp['medians'],
+  bp['means']
+  ):
+    box.set_color(color)
+    median.set_color(color)
+    mean.set(markerfacecolor=color, markeredgecolor=color)
+  for whisker in bp['whiskers']:
+    whisker.set_color(color)
+  for cap in bp['caps']:
+    cap.set_color(color)
+
+def plot_rank_box_nokne(ranks, name):
+  if name=='ALL':
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12,7))
+  else:
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(9,7))
+    
+  for i, sc in enumerate(scoring):
+    ax = axes[i/2, i%2]
+    xlabels = ['Ensembles', 'DES']
+    x_ticks = [1,11,22]
+    
+    gap = 2
+    start_pos = 2
+    #fig, ax = plt.subplots()
+    bp_ensembles = ax.boxplot(ranks[:,:3,i], positions=np.arange(start_pos, start_pos+3), showmeans=True, showfliers=False, widths=0.5)#, meanprops=meanpointprops, patch_artist=True)
+    color_box(bp_ensembles, 'steelblue')
+
+    start_pos += (3+gap)
+    bp_des = ax.boxplot(remove_kne_box(ranks[:,3:13,i]), positions=np.arange(start_pos, start_pos+9), showmeans=True, showfliers=False, widths=0.5)
+    color_box(bp_des, 'indianred')
+
+    start_pos += 9+gap
+    bp_name0 = ax.boxplot(remove_kne_box(ranks[:,13:23,i]), positions=np.arange(start_pos, start_pos+9), showmeans=True, showfliers=False, widths=0.5)
+    color_box(bp_name0, 'seagreen')
+    if name=='ALL':
+      xlabels.append('DES-LEC')
+    else:
+      xlabels.append('DES-%s'%name)
+    
+    if ranks.shape[1]>23:
+      start_pos += 9+gap
+      bp_name1 = ax.boxplot(remove_kne_box(ranks[:,23:33,i]), positions=np.arange(start_pos, start_pos+9), showmeans=True, showfliers=False, widths=0.5)
+      color_box(bp_name1, 'slateblue')
+      xlabels.append('DES-LMNN')
+      x_ticks.append(33)
+
+      start_pos += 9+gap
+      bp_name2 = ax.boxplot(remove_kne_box(ranks[:,33:43,i]), positions=np.arange(start_pos, start_pos+9), showmeans=True, showfliers=False, widths=0.5)
+      #color_box(bp_name2, 'navajowhite')
+      #color_box(bp_name2, 'burlywood')
+      color_box(bp_name2, 'peru')
+      xlabels.append('DES-RE')
+      x_ticks.append(44)
+    
+    ax.set_xticks(x_ticks)
+    ax.set_xticklabels(xlabels)
+    #ax.set_ylabel('Rank of %s'%sc)
+
+    ax.text(.5,.9,'%s score rank distribution'%sc,
+    horizontalalignment='center', fontsize='medium',
+    transform=ax.transAxes)
+  fig.tight_layout()
+  #plt.savefig('results/rank_box_%s_%s.pdf'%(name, sc), format='pdf')
+  plt.savefig('results/rank_box_%s_together.png'%name, format='png')
+  plt.close()
+
 def remove_kne(arr):
   return np.hstack([arr[:2], arr[3:]])
 
 def plot_rank_nokne(avg_rank, name):
   colors = itertools.cycle(['steelblue', 'indianred', 'darkseagreen', 'slateblue', 'navajowhite'])
   for i, sc in enumerate(scoring):
-    xlabels = ['Ensembles', 'Original DES']
+    xlabels = ['Ensembles', 'DES']
     x_ticks = [1,9,20]
     fig, ax = plt.subplots()
 
