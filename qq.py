@@ -96,11 +96,10 @@ class Results_Combine:
 
   def plot_all_best(self):
     for name, para, (k, n), rr in self.rr_list:
-      #rr.plot_bar_scores(k, n, para, self.format)
       rr.plot_bar_scores_together(k, n, para, self.format)
-      rr.plot_n_effect_together(k, para, False, self.format)
-      rr.plot_k_effect_together(n, para, False, self.format)
-    self.plot_comp_best_together()
+      #rr.plot_n_effect_together(k, para, False, self.format)
+      #rr.plot_k_effect_together(n, para, False, self.format)
+    #self.plot_comp_best_together()
   
   def plot_table_all_best(self):
     self.plot_table_best('LEC')
@@ -295,16 +294,10 @@ class Results:
       #fig, ax = plt.subplots()
       ind = np.arange(len(methods))
       width = 0.4 
+      opacity = 0.8
       #width = 0.85/len(2)
-      rects_des = ax.bar(ind, des_scores, width, color='steelblue', label='DES')
-      rects_winner = ax.bar(ind+width, winner_scores, width, color='indianred', label='DES-%s'%self.name)
-      for rect_des, rect_winner in itertools.izip(rects_des, rects_winner):
-        height_des = rect_des.get_height()
-        height_winner = rect_winner.get_height()
-        ax.text(rect_winner.get_x()+rect_winner.get_width()/2., height_winner+0.002, '%.1f'%(100.0*(height_winner-height_des)), ha='center', va='bottom', fontsize='small')
-      #ax.set_ylabel('%s scores' %sc)
-      #ax.set_xlabel('DES models')
-      #ax.set_title('%s scores' %sc, fontsize='small')
+      rects_des = ax.bar(ind, des_scores, width, alpha=opacity, color='steelblue', label='DES')
+      rects_winner = ax.bar(ind+width, winner_scores, width, alpha=opacity, color='indianred', label='DES-%s'%self.name)
       ax.text(.5,.9,'%s scores' %sc,
       horizontalalignment='center', fontsize='medium',
       transform=ax.transAxes)
@@ -320,6 +313,14 @@ class Results:
       ax.set_ylim(\
       bottom=max(0, y_axis_bottom),\
       top=score_max+score_diff*.5)
+
+      y_min, y_max = ax.get_ylim()
+      for rect_des, rect_winner in itertools.izip(rects_des, rects_winner):
+        height_des = rect_des.get_height()
+        height_winner = rect_winner.get_height()
+        #ax.text(rect_winner.get_x()+rect_winner.get_width()/2., height_winner+0.002, '%+.1f'%(100.0*(height_winner-height_des)), ha='center', va='bottom', fontsize='small')
+        ax.text(rect_winner.get_x()+rect_winner.get_width()/2., height_winner+(y_max-y_min)/50.0, '%+.1f'%(100.0*(height_winner-height_des)), ha='center', va='bottom', fontsize='small')
+
       for j, (ref_name, ref_color) in enumerate(ref_names):
         ax.axhline(self.refs[j, i], linewidth=2, label=ref_name, color=ref_color, ls=':')
     #plt.legend(fontsize='small', loc='upper center', bbox_to_anchor=(-0.1, -0.1), ncol=5)
@@ -410,22 +411,33 @@ class Results:
     plt.savefig(self.dst+'/kk_together_%s.%s'%(self.name, output_format), format=output_format, bbox_inches="tight")
     plt.close()
 
-
   def plot_vl_effect(self, k, n):
     para_list = list(set(map(lambda x:x[1], self.dict_scores.keys())))
     para_list.sort()
     if self.name=='LEC':
       labels = ['l=%s'%p for p in para_list]
+      labels[0] = 'l=0.1'
     elif self.name=='LMNN':
       labels = ['v=%s'%p for p in para_list]
     else:
       labels = ['s=%s'%p for p in para_list]
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(14,7), sharex=True)
     for i, sc in enumerate(scoring):
+      assert True
+      ax = axes[i/2, i%2]
       para_scores = [[self.dict_scores[(k, pa, method, n)][1][i] for method in methods] for pa in para_list]
       title = 'k=%d, n=%d' %(k, n+1)
       ylabel = '%s scores' %sc
       prefix = self.dst + '/vls_%s_%s'%(self.name, sc)
-      plot_comp(para_scores, labels, None, ylabel, title, prefix, 'pdf')
+      plot_comp_together(ax, para_scores, labels, None, ylabel, title, prefix, 'pdf')
+      ax.text(.5,.9,'%s scores' %sc,
+      horizontalalignment='center', fontsize='medium',
+      transform=ax.transAxes)
+    plt.legend(fontsize='small', loc=8, bbox_to_anchor=(0., 2.13), ncol=7)
+    fig.tight_layout()
+    #plt.savefig(self.dst+'/vls_%s.png' %(self.name), format='png', bbox_inches="tight")
+    plt.savefig(self.dst+'/vls_%s.pdf' %(self.name), format='pdf', bbox_inches="tight")
+    plt.close()
 
 def plot_comp(scores, names, ref, ylabel, title, prefix, output_format):
   colors = itertools.cycle(excel_colors[:len(names)])
@@ -579,10 +591,11 @@ def color_box(bp, color):
 
 def plot_rank_box_nokne(ranks, name):
   if name=='ALL':
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12,7))
+    fs = (12,8)
   else:
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(9,7))
-    
+    fs = (9,6)
+  #fig, axes = plt.subplots(nrows=2, ncols=2, figsize=fs, sharex='col', sharey='row')
+  fig, axes = plt.subplots(nrows=2, ncols=2, figsize=fs)
   for i, sc in enumerate(scoring):
     ax = axes[i/2, i%2]
     xlabels = ['Ensembles', 'DES']
@@ -625,12 +638,12 @@ def plot_rank_box_nokne(ranks, name):
     ax.set_xticklabels(xlabels)
     #ax.set_ylabel('Rank of %s'%sc)
 
-    ax.text(.5,.9,'%s score rank distribution'%sc,
+    ax.text(.5,.9,'%s rankings'%sc,
     horizontalalignment='center', fontsize='medium',
     transform=ax.transAxes)
   fig.tight_layout()
-  #plt.savefig('results/rank_box_%s_%s.pdf'%(name, sc), format='pdf')
-  plt.savefig('results/rank_box_%s_together.png'%name, format='png')
+  plt.savefig('results/rank_box_together_%s.pdf'%name, format='pdf')
+  #plt.savefig('results/rank_box_together_%s.png'%name, format='png')
   plt.close()
 
 def remove_kne(arr):
